@@ -1,0 +1,9 @@
+{application, json,
+[
+  {description, "a high level json library for erlang (17+)"},
+  {vsn, "0.1.0"},
+  {modules, [json]},
+  {registered, []},
+  {applications, [kernel, stdlib, jsx, jsonpointer]},
+  {env, []}
+]}.
