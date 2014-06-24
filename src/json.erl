@@ -23,7 +23,7 @@
 -module(json).
 
 -export([from_binary/1, to_binary/1]).
--export([get/2, add/3, remove/2, replace/3, copy/3, move/3]).
+-export([get/2, add/3, remove/2, replace/3, copy/3, move/3, test/2]).
 -export([init/1, handle_event/2]).
 
 
@@ -92,6 +92,13 @@ copy(From, To, JSON) ->
 move(From, To, JSON) ->
   try remove(From, copy(From, To, JSON))
   catch error:_ -> erlang:error(badarg)
+  end.
+
+-spec test(path(), json()) -> true | false.
+
+test(Path, JSON) ->
+  try get(Path, JSON), true
+  catch error:_ -> false
   end.
 
 
@@ -543,6 +550,23 @@ replace_test_() ->
     ?_assertError(badarg, replace(<<"a/">>, JSON, #{})),
     ?_assertError(badarg, replace(a, JSON, #{})),
     ?_assertError(badarg, replace(1, JSON, #{}))
+  ].
+
+
+test_test_() ->
+  JSON = #{
+    <<"a">> => 1,
+    <<"b">> => #{<<"c">> => 2},
+    <<"d">> => #{
+      <<"e">> => [#{<<"a">> => 3}, #{<<"b">> => 4}, #{<<"c">> => 5}]
+    }
+  },
+  [
+    ?_assertEqual(true, test(<<"/a">>, JSON)),
+    ?_assertEqual(true, test(<<"/b/c">>, JSON)),
+    ?_assertEqual(true, test(<<"/d/e/0/a">>, JSON)),
+    ?_assertEqual(true, test(<<"/d/e/1/b">>, JSON)),
+    ?_assertEqual(false, test(<<"/e">>, JSON))
   ].
 
 
