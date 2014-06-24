@@ -27,20 +27,39 @@
 -export([init/1, handle_event/2]).
 
 
+-type path() :: binary() | [atom() | integer() | binary()].
+-type json() :: #{integer() | atom() | binary() => json()}
+  | [json()]
+  | integer()
+  | float()
+  | binary()
+  | true
+  | false
+  | null.
+
+
+-spec from_binary(binary()) -> json().
+
 from_binary(JSON) ->
   try (jsx:decoder(?MODULE, [], []))(JSON)
   catch error:_ -> erlang:error(badarg)
   end.
+
+-spec to_binary(json()) -> binary().
 
 to_binary(JSON) ->
   try jsx:encode(JSON)
   catch error:_ -> erlang:error(badarg)
   end.
 
+-spec get(path(), json()) -> json().
+
 get(Path, JSON) ->
   try get0(maybe_decode(Path), JSON)
   catch error:_ -> erlang:error(badarg)
   end.
+
+-spec add(path(), json(), json()) -> json().
 
 add(Path, JSON, Value) ->
   try add0(maybe_decode(Path), JSON, Value)
