@@ -21,9 +21,12 @@
 %% THE SOFTWARE.
 
 -module(json).
+-compile({no_auto_import,[get/1]}).
 
 -export([from_binary/1, to_binary/1]).
 -export([get/2, add/3, remove/2, replace/3, copy/3, move/3, test/2]).
+-export([get/1, add/2, remove/1, replace/2, copy/2, move/2, test/1]).
+-export([fold/2]).
 -export([init/1, handle_event/2]).
 
 
@@ -53,53 +56,85 @@ to_binary(JSON) ->
   end.
 
 -spec get(Path::path(), JSON::json()) -> json().
+-spec get(Path::path()) -> fun((JSON::json()) -> json()).
 
 get(Path, JSON) ->
   try get0(maybe_decode(Path), JSON)
   catch error:_ -> erlang:error(badarg)
   end.
 
+get(Path) -> fun(JSON) -> get(Path, JSON) end.
+
+
 -spec add(Path::path(), Value::json(), JSON::json()) -> json().
+-spec add(Path::path(), Value::json()) -> fun((JSON::json()) -> json()).
 
 add(Path, Value, JSON) ->
   try add0(maybe_decode(Path), Value, JSON)
   catch error:_ -> erlang:error(badarg)
   end.
 
+add(Path, Value) -> fun(JSON) -> add(Path, Value, JSON) end.
+
+
 -spec remove(Path::path(), JSON::json()) -> json().
+-spec remove(Path::path()) -> fun((JSON::json()) -> json()).
 
 remove(Path, JSON) ->
   try remove0(maybe_decode(Path), JSON)
   catch error:_ -> erlang:error(badarg)
   end.
 
+remove(Path) -> fun(JSON) -> remove(Path, JSON) end.
+
+
 -spec replace(Path::path(), Value::json(), JSON::json()) -> json().
+-spec replace(Path::path(), Value::json()) -> fun((JSON::json()) -> json()).
 
 replace(Path, Value, JSON) ->
   try add(Path, Value, remove(Path, JSON))
   catch error:_ -> erlang:error(badarg)
   end.
 
+replace(Path, Value) -> fun(JSON) -> replace(Path, Value, JSON) end.
+
+
 -spec copy(From::path(), To::path(), JSON::json()) -> json().
+-spec copy(From::path(), To::path()) -> fun((JSON::json()) -> json()).
 
 copy(From, To, JSON) ->
-  try add(To, JSON, get(From, JSON))
+  try add(To, get(From, JSON), JSON)
   catch error:_ -> erlang:error(badarg)
   end.
 
+copy(From, To) -> fun(JSON) -> copy(From, To, JSON) end.
+
+
 -spec move(From::path(), To::path(), JSON::json()) -> json().
+-spec move(From::path(), To::path()) -> fun((JSON::json()) -> json()).
 
 move(From, To, JSON) ->
   try remove(From, copy(From, To, JSON))
   catch error:_ -> erlang:error(badarg)
   end.
 
+move(From, To) -> fun(JSON) -> move(From, To, JSON) end.
+
+
 -spec test(Path::path(), JSON::json()) -> json().
+-spec test(Path::path()) -> fun((JSON::json()) -> json()).
 
 test(Path, JSON) ->
   try get(Path, JSON), JSON
   catch error:_ -> erlang:error(badarg)
   end.
+
+test(Path) -> fun(JSON) -> test(Path, JSON) end.
+
+
+-spec fold([function()], JSON::json()) -> json().
+
+fold(Funs, JSON) -> lists:foldl(fun(Fun, IR) -> Fun(IR) end, JSON, Funs).
 
 
 % internal functions
@@ -567,6 +602,25 @@ test_test_() ->
     ?_assertEqual(JSON, test(<<"/d/e/0/a">>, JSON)),
     ?_assertEqual(JSON, test(<<"/d/e/1/b">>, JSON)),
     ?_assertError(badarg, test(<<"/e">>, JSON))
+  ].
+
+
+fold_test_() ->
+  JSON = #{<<"foo">> => <<"bar">>},
+  [
+    ?_assertEqual(
+      JSON,
+      fold([
+        test(<<"/foo">>),
+        copy(<<"/foo">>, <<"/qux">>),
+        test(<<"/qux">>),
+        replace(<<"/qux">>, <<"baz">>),
+        remove(<<"/foo">>),
+        move(<<"/qux">>, <<"/foo">>),
+        replace(<<"/foo">>, JSON),
+        get(<<"/foo">>)
+      ], JSON)
+    )
   ].
 
 
