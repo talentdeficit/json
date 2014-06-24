@@ -23,18 +23,44 @@
 -module(json).
 
 -export([from_binary/1, to_binary/1]).
+-export([get/2]).
 -export([init/1, handle_event/2]).
 
 
-from_binary(JSON)
-when is_binary(JSON) ->
-  (jsx:decoder(?MODULE, [], []))(JSON).
+from_binary(JSON) ->
+  try (jsx:decoder(?MODULE, [], []))(JSON)
+  catch error:_ -> erlang:error(badarg)
+  end.
 
 
 to_binary(JSON) ->
   try jsx:encode(JSON)
   catch error:_ -> erlang:error(badarg)
   end.
+
+
+get(Path, JSON) ->
+  try get0(maybe_decode(Path), JSON)
+  catch error:_ -> erlang:error(badarg)
+  end.
+
+maybe_decode(Path) when is_list(Path) -> Path;
+maybe_decode(Path) when is_binary(Path) -> jsonpointer:decode(Path).
+
+get0([], JSON) -> JSON;
+get0([Ref|Rest], JSON)
+when is_binary(Ref), is_map(JSON) ->
+  get0(Rest, maps:get(Ref, JSON));
+get0([Ref|Rest], JSON)
+when is_atom(Ref), is_map(JSON) ->
+  get0(Rest, maps:get(atom_to_binary(Ref, utf8), JSON));
+get0([Ref|Rest], JSON)
+when is_integer(Ref), is_list(JSON) ->
+  % jsonpointer arrays are zero indexed, erlang lists are indexed from 1
+  get0(Rest, lists:nth(Ref + 1, JSON));
+get0([Ref|Rest], JSON)
+when is_binary(Ref), is_list(JSON) ->
+  get0([jsonpointer:ref_to_int(Ref)] ++ Rest, JSON).
 
 
 % replace the decode backend of jsx with our own that produces maps
@@ -100,7 +126,7 @@ insert(_, _) -> erlang:error(badarg).
 -include_lib("eunit/include/eunit.hrl").
 
 
-basic_decode_test_() ->
+decode_test_() ->
   [
     {"empty object", ?_assertEqual(#{}, from_binary(<<"{}">>))},
     {"simple object", ?_assertEqual(
@@ -134,6 +160,40 @@ basic_decode_test_() ->
     )},
     {"empty list", ?_assertEqual([], from_binary(<<"[]">>))},
     {"raw value", ?_assertEqual(1.0, from_binary(<<"1.0">>))}
+  ].
+
+
+get_test_() ->
+  JSON = #{
+    <<"a">> => 1,
+    <<"b">> => #{<<"c">> => 2},
+    <<"d">> => #{
+      <<"e">> => [#{<<"a">> => 3}, #{<<"b">> => 4}, #{<<"c">> => 5}]
+    }
+  },
+  [
+    ?_assertEqual(JSON, get(<<>>, JSON)),
+    ?_assertEqual(JSON, get([], JSON)),
+    ?_assertEqual(1, get(<<"/a">>, JSON)),
+    ?_assertEqual(1, get([<<"a">>], JSON)),
+    ?_assertEqual(1, get([a], JSON)),
+    ?_assertEqual(2, get(<<"/b/c">>, JSON)),
+    ?_assertEqual(2, get([<<"b">>, <<"c">>], JSON)),
+    ?_assertEqual(2, get([b, c], JSON)),
+    ?_assertEqual(3, get(<<"/d/e/0/a">>, JSON)),
+    ?_assertEqual(3, get([<<"d">>, <<"e">>, <<"0">>, <<"a">>], JSON)),
+    ?_assertEqual(3, get([d, e, 0, a], JSON)),
+    ?_assertEqual(4, get(<<"/d/e/1/b">>, JSON)),
+    ?_assertEqual(4, get([<<"d">>, <<"e">>, <<"1">>, <<"b">>], JSON)),
+    ?_assertEqual(4, get([d, e, 1, b], JSON)),
+    ?_assertEqual(5, get(<<"/d/e/2/c">>, JSON)),
+    ?_assertEqual(5, get([<<"d">>, <<"e">>, <<"2">>, <<"c">>], JSON)),
+    ?_assertEqual(5, get([d, e, 2 ,c], JSON)),
+    ?_assertError(badarg, get(<<"/e">>, JSON)),
+    ?_assertError(badarg, get(<<"a">>, JSON)),
+    ?_assertError(badarg, get(<<"a/">>, JSON)),
+    ?_assertError(badarg, get(a, JSON)),
+    ?_assertError(badarg, get(1, JSON))
   ].
 
 
