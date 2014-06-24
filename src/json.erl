@@ -23,7 +23,7 @@
 -module(json).
 
 -export([from_binary/1, to_binary/1]).
--export([get/2]).
+-export([get/2, add/3]).
 -export([init/1, handle_event/2]).
 
 
@@ -44,6 +44,15 @@ get(Path, JSON) ->
   catch error:_ -> erlang:error(badarg)
   end.
 
+
+add(Path, JSON, Value) ->
+  try add0(maybe_decode(Path), JSON, Value)
+  catch error:_ -> erlang:error(badarg)
+  end.
+
+
+% internal functions
+
 maybe_decode(Path) when is_list(Path) -> Path;
 maybe_decode(Path) when is_binary(Path) -> jsonpointer:decode(Path).
 
@@ -61,6 +70,33 @@ when is_integer(Ref), is_list(JSON) ->
 get0([Ref|Rest], JSON)
 when is_binary(Ref), is_list(JSON) ->
   get0([jsonpointer:ref_to_int(Ref)] ++ Rest, JSON).
+
+
+add0([], _JSON, Value) -> Value;
+add0([Ref], JSON, Value)
+when is_binary(Ref), is_map(JSON) ->
+  maps:put(Ref, Value, JSON);
+add0([Ref], JSON, Value)
+when is_integer(Ref), is_list(JSON) ->
+  {A, B} = lists:split(Ref, JSON),
+  A ++ [Value] ++ B;
+add0([<<"-">>], JSON, Value)
+when is_list(JSON) ->
+  JSON ++ [Value];
+add0([Ref|Rest], JSON, Value)
+when is_binary(Ref), is_map(JSON) ->
+  maps:update(Ref, add0(Rest, get([Ref], JSON), Value), JSON);
+add0([Ref|Rest], JSON, Value)
+when is_integer(Ref), is_list(JSON) ->
+  {A, [B|C]} = lists:split(Ref, JSON),
+  A ++ [add0(Rest, B, Value)] ++ C;
+add0([Ref|Rest], JSON, Value)
+when is_atom(Ref), is_map(JSON) ->
+  add0([atom_to_binary(Ref, utf8)] ++ Rest, JSON, Value);
+add0([Ref|Rest], JSON, Value)
+when is_binary(Ref), is_list(JSON) ->
+  add0([jsonpointer:ref_to_int(Ref)] ++ Rest, JSON, Value).
+
 
 
 % replace the decode backend of jsx with our own that produces maps
@@ -194,6 +230,62 @@ get_test_() ->
     ?_assertError(badarg, get(<<"a/">>, JSON)),
     ?_assertError(badarg, get(a, JSON)),
     ?_assertError(badarg, get(1, JSON))
+  ].
+
+
+add_test_() ->
+  [
+    ?_assertEqual(<<"foo">>, add(<<>>, #{}, <<"foo">>)),
+    ?_assertEqual(<<"foo">>, add([], #{}, <<"foo">>)),
+    ?_assertEqual(<<"foo">>, add(<<>>, #{<<"bar">> => <<"baz">>}, <<"foo">>)),
+    ?_assertEqual(<<"foo">>, add([], #{<<"bar">> => <<"baz">>}, <<"foo">>)),
+    ?_assertEqual(
+      #{<<"foo">> => <<"baz">>},
+      add(<<"/foo">>, #{<<"foo">> => <<"bar">>}, <<"baz">>)
+    ),
+    ?_assertEqual(
+      #{<<"foo">> => <<"baz">>},
+      add([<<"foo">>], #{<<"foo">> => <<"bar">>}, <<"baz">>)
+    ),
+    ?_assertEqual(
+      #{<<"foo">> => <<"baz">>},
+      add([foo], #{<<"foo">> => <<"bar">>}, <<"baz">>)
+    ),
+    ?_assertEqual(
+      #{<<"baz">> => <<"qux">>, <<"foo">> => <<"bar">>},
+      add(<<"/baz">>, #{<<"foo">> => <<"bar">>}, <<"qux">>)
+    ),
+    ?_assertEqual(
+      #{<<"foo">> => [<<"bar">>, <<"qux">>, <<"baz">>]},
+      add(<<"/foo/1">>, #{<<"foo">> => [<<"bar">>, <<"baz">>]}, <<"qux">>)
+    ),
+    ?_assertEqual(
+      #{<<"foo">> => [<<"bar">>, <<"qux">>, <<"baz">>]},
+      add([<<"foo">>, 1], #{<<"foo">> => [<<"bar">>, <<"baz">>]}, <<"qux">>)
+    ),
+    ?_assertEqual(
+      #{<<"foo">> => [#{<<"bar">> => 1}]},
+      add(<<"/foo/0/bar">>, #{<<"foo">> => [#{<<"bar">> => 0}]}, 1)
+    ),
+    ?_assertEqual(
+      #{<<"foo">> => [#{<<"bar">> => 1}]},
+      add([<<"foo">>, 0, <<"bar">>], #{<<"foo">> => [#{<<"bar">> => 0}]}, 1)
+    ),
+    ?_assertEqual(
+      #{
+        <<"foo">> => <<"bar">>,
+        <<"child">> => #{<<"grandchild">> => #{}}
+      },
+      add(<<"/child">>, #{<<"foo">> => <<"bar">>}, #{<<"grandchild">> => #{}})
+    ),
+    ?_assertEqual(
+      #{<<"foo">> => [<<"bar">>, [<<"abc">>, <<"def">>]]},
+      add(<<"/foo/-">>, #{<<"foo">> => [<<"bar">>]}, [<<"abc">>, <<"def">>])
+    ),
+    ?_assertError(
+      badarg,
+      add(<<"/baz/bat">>, #{<<"foo">> => <<"bar">>}, <<"qux">>)
+    )
   ].
 
 
