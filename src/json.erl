@@ -23,7 +23,7 @@
 -module(json).
 
 -export([from_binary/1, to_binary/1]).
--export([get/2, add/3]).
+-export([get/2, add/3, remove/2]).
 -export([init/1, handle_event/2]).
 
 
@@ -63,6 +63,13 @@ get(Path, JSON) ->
 
 add(Path, JSON, Value) ->
   try add0(maybe_decode(Path), JSON, Value)
+  catch error:_ -> erlang:error(badarg)
+  end.
+
+-spec remove(path(), json()) -> json().
+
+remove(Path, JSON) ->
+  try remove0(maybe_decode(Path), JSON)
   catch error:_ -> erlang:error(badarg)
   end.
 
@@ -112,6 +119,30 @@ add0([Ref|Rest], JSON, Value)
 when is_binary(Ref), is_list(JSON) ->
   add0([jsonpointer:ref_to_int(Ref)] ++ Rest, JSON, Value).
 
+remove0([], _JSON) -> erlang:error(badarg);
+remove0([Ref], JSON)
+when is_binary(Ref), is_map(JSON) ->
+  case maps:is_key(Ref, JSON) of
+    true -> maps:remove(Ref, JSON);
+    false -> erlang:error(badarg)
+  end;
+remove0([Ref], JSON)
+when is_integer(Ref), is_list(JSON) ->
+  {A, [_|B]} = lists:split(Ref, JSON),
+  A ++ B;
+remove0([Ref|Rest], JSON)
+when is_binary(Ref), is_map(JSON) ->
+  maps:update(Ref, remove0(Rest, get([Ref], JSON)), JSON);
+remove0([Ref|Rest], JSON)
+when is_integer(Ref), is_list(JSON) ->
+  {A, [B|C]} = lists:split(Ref, JSON),
+  A ++ [remove0(Rest, B)] ++ C;
+remove0([Ref|Rest], JSON)
+when is_atom(Ref), is_map(JSON) ->
+  remove0([atom_to_binary(Ref, utf8)] ++ Rest, JSON);
+remove0([Ref|Rest], JSON)
+when is_binary(Ref), is_list(JSON) ->
+  remove0([jsonpointer:ref_to_int(Ref)] ++ Rest, JSON).
 
 % replace the decode backend of jsx with one that produces maps
 
@@ -296,6 +327,142 @@ add_test_() ->
       badarg,
       add(<<"/baz/bat">>, #{<<"foo">> => <<"bar">>}, <<"qux">>)
     )
+  ].
+
+
+remove_test_() ->
+  JSON = #{
+    <<"a">> => 1,
+    <<"b">> => #{<<"c">> => 2},
+    <<"d">> => #{
+      <<"e">> => [#{<<"a">> => 3}, #{<<"b">> => 4}, #{<<"c">> => 5}]
+    }
+  },
+  [
+    ?_assertError(badarg, remove(<<>>, JSON)),
+    ?_assertError(badarg, remove([], JSON)),
+    ?_assertEqual(
+      #{
+        <<"b">> => #{<<"c">> => 2},
+        <<"d">> => #{
+          <<"e">> => [#{<<"a">> => 3}, #{<<"b">> => 4}, #{<<"c">> => 5}]
+        }
+      },
+      remove(<<"/a">>, JSON)
+    ),
+    ?_assertEqual(
+      #{
+        <<"b">> => #{<<"c">> => 2},
+        <<"d">> => #{
+          <<"e">> => [#{<<"a">> => 3}, #{<<"b">> => 4}, #{<<"c">> => 5}]
+        }
+      },
+      remove([<<"a">>], JSON)
+    ),
+    ?_assertEqual(
+      #{
+        <<"b">> => #{<<"c">> => 2},
+        <<"d">> => #{
+          <<"e">> => [#{<<"a">> => 3}, #{<<"b">> => 4}, #{<<"c">> => 5}]
+        }
+      },
+      remove([a], JSON)
+    ),
+    ?_assertEqual(
+      #{
+        <<"a">> => 1,
+        <<"b">> => #{},
+        <<"d">> => #{
+          <<"e">> => [#{<<"a">> => 3}, #{<<"b">> => 4}, #{<<"c">> => 5}]
+        }
+      },
+      remove(<<"/b/c">>, JSON)
+    ),
+    ?_assertEqual(
+      #{
+        <<"a">> => 1,
+        <<"b">> => #{},
+        <<"d">> => #{
+          <<"e">> => [#{<<"a">> => 3}, #{<<"b">> => 4}, #{<<"c">> => 5}]
+        }
+      },
+      remove([<<"b">>, <<"c">>], JSON)
+    ),
+    ?_assertEqual(
+      #{
+        <<"a">> => 1,
+        <<"b">> => #{},
+        <<"d">> => #{
+          <<"e">> => [#{<<"a">> => 3}, #{<<"b">> => 4}, #{<<"c">> => 5}]
+        }
+      },
+      remove([b, c], JSON)
+    ),
+    ?_assertEqual(
+      #{
+        <<"a">> => 1,
+        <<"b">> => #{<<"c">> => 2},
+        <<"d">> => #{
+          <<"e">> => [#{}, #{<<"b">> => 4}, #{<<"c">> => 5}]
+        }
+      },
+      remove(<<"/d/e/0/a">>, JSON)
+    ),
+    ?_assertEqual(
+      #{
+        <<"a">> => 1,
+        <<"b">> => #{<<"c">> => 2},
+        <<"d">> => #{
+          <<"e">> => [#{}, #{<<"b">> => 4}, #{<<"c">> => 5}]
+        }
+      },
+      remove([<<"d">>, <<"e">>, <<"0">>, <<"a">>], JSON)
+    ),
+    ?_assertEqual(
+      #{
+        <<"a">> => 1,
+        <<"b">> => #{<<"c">> => 2},
+        <<"d">> => #{
+          <<"e">> => [#{}, #{<<"b">> => 4}, #{<<"c">> => 5}]
+        }
+      },
+      remove([d, e, 0, a], JSON)
+    ),
+    ?_assertEqual(
+      #{
+        <<"a">> => 1,
+        <<"b">> => #{<<"c">> => 2},
+        <<"d">> => #{
+          <<"e">> => [#{<<"a">> => 3}, #{}, #{<<"c">> => 5}]
+        }
+      },
+      remove(<<"/d/e/1/b">>, JSON)
+    ),
+    ?_assertEqual(
+      #{
+        <<"a">> => 1,
+        <<"b">> => #{<<"c">> => 2},
+        <<"d">> => #{
+          <<"e">> => [#{<<"a">> => 3}, #{}, #{<<"c">> => 5}]
+        }
+      },
+      remove([<<"d">>, <<"e">>, <<"1">>, <<"b">>], JSON)
+    ),
+    ?_assertEqual(
+      #{
+        <<"a">> => 1,
+        <<"b">> => #{<<"c">> => 2},
+        <<"d">> => #{
+          <<"e">> => [#{<<"a">> => 3}, #{}, #{<<"c">> => 5}]
+        }
+      },
+      remove([d, e, 1, b], JSON)
+    ),
+    ?_assertError(badarg, remove(<<"/e">>, JSON)),
+    ?_assertError(badarg, remove(<<"a">>, JSON)),
+    ?_assertError(badarg, remove(<<"a/">>, JSON)),
+    ?_assertError(badarg, remove(a, JSON)),
+    ?_assertError(badarg, remove(1, JSON))
   ].
 
 
