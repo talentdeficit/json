@@ -94,11 +94,11 @@ move(From, To, JSON) ->
   catch error:_ -> erlang:error(badarg)
   end.
 
--spec test(Path::path(), JSON::json()) -> true | false.
+-spec test(Path::path(), JSON::json()) -> json().
 
 test(Path, JSON) ->
-  try get(Path, JSON), true
-  catch error:_ -> false
+  try get(Path, JSON), JSON
+  catch error:_ -> erlang:error(badarg)
   end.
 
 
@@ -562,11 +562,11 @@ test_test_() ->
     }
   },
   [
-    ?_assertEqual(true, test(<<"/a">>, JSON)),
-    ?_assertEqual(true, test(<<"/b/c">>, JSON)),
-    ?_assertEqual(true, test(<<"/d/e/0/a">>, JSON)),
-    ?_assertEqual(true, test(<<"/d/e/1/b">>, JSON)),
-    ?_assertEqual(false, test(<<"/e">>, JSON))
+    ?_assertEqual(JSON, test(<<"/a">>, JSON)),
+    ?_assertEqual(JSON, test(<<"/b/c">>, JSON)),
+    ?_assertEqual(JSON, test(<<"/d/e/0/a">>, JSON)),
+    ?_assertEqual(JSON, test(<<"/d/e/1/b">>, JSON)),
+    ?_assertError(badarg, test(<<"/e">>, JSON))
   ].
 
 
