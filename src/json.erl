@@ -32,18 +32,15 @@ from_binary(JSON) ->
   catch error:_ -> erlang:error(badarg)
   end.
 
-
 to_binary(JSON) ->
   try jsx:encode(JSON)
   catch error:_ -> erlang:error(badarg)
   end.
 
-
 get(Path, JSON) ->
   try get0(maybe_decode(Path), JSON)
   catch error:_ -> erlang:error(badarg)
   end.
-
 
 add(Path, JSON, Value) ->
   try add0(maybe_decode(Path), JSON, Value)
@@ -71,7 +68,6 @@ get0([Ref|Rest], JSON)
 when is_binary(Ref), is_list(JSON) ->
   get0([jsonpointer:ref_to_int(Ref)] ++ Rest, JSON).
 
-
 add0([], _JSON, Value) -> Value;
 add0([Ref], JSON, Value)
 when is_binary(Ref), is_map(JSON) ->
@@ -98,8 +94,7 @@ when is_binary(Ref), is_list(JSON) ->
   add0([jsonpointer:ref_to_int(Ref)] ++ Rest, JSON, Value).
 
 
-
-% replace the decode backend of jsx with our own that produces maps
+% replace the decode backend of jsx with one that produces maps
 
 -type state() :: [any()].
 -spec init([]) -> state().
@@ -109,15 +104,11 @@ init([]) -> [].
 -spec handle_event(Event::any(), State::state()) -> state().
 
 handle_event(end_json, State) -> State;
-
 handle_event(start_object, State) -> start_object(State);
 handle_event(end_object, State) -> finish(State);
-
 handle_event(start_array, State) -> start_array(State);
 handle_event(end_array, State) -> finish(State);
-
 handle_event({key, Key}, State) -> insert(Key, State);
-
 handle_event({_, Event}, State) -> insert(Event, State).
 
 %% internal state is a stack of in progress objects/arrays
