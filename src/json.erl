@@ -23,7 +23,7 @@
 -module(json).
 
 -export([from_binary/1, to_binary/1]).
--export([get/2, add/3, remove/2]).
+-export([get/2, add/3, remove/2, replace/3, copy/3, move/3]).
 -export([init/1, handle_event/2]).
 
 
@@ -70,6 +70,27 @@ add(Path, JSON, Value) ->
 
 remove(Path, JSON) ->
   try remove0(maybe_decode(Path), JSON)
+  catch error:_ -> erlang:error(badarg)
+  end.
+
+-spec replace(path(), json(), json()) -> json().
+
+replace(Path, JSON, Value) ->
+  try add(Path, remove(Path, JSON), Value)
+  catch error:_ -> erlang:error(badarg)
+  end.
+
+-spec copy(path(), path(), json()) -> json().
+
+copy(From, To, JSON) ->
+  try add(To, JSON, get(From, JSON))
+  catch error:_ -> erlang:error(badarg)
+  end.
+
+-spec move(path(), path(), json()) -> json().
+
+move(From, To, JSON) ->
+  try remove(From, copy(From, To, JSON))
   catch error:_ -> erlang:error(badarg)
   end.
 
@@ -463,6 +484,65 @@ remove_test_() ->
     ?_assertError(badarg, remove(<<"a/">>, JSON)),
     ?_assertError(badarg, remove(a, JSON)),
     ?_assertError(badarg, remove(1, JSON))
+  ].
+
+
+replace_test_() ->
+  JSON = #{
+    <<"a">> => 1,
+    <<"b">> => #{<<"c">> => 2},
+    <<"d">> => #{
+      <<"e">> => [#{<<"a">> => 3}, #{<<"b">> => 4}, #{<<"c">> => 5}]
+    }
+  },
+  [
+    ?_assertError(badarg, replace(<<>>, JSON, #{})),
+    ?_assertError(badarg, replace([], JSON, #{})),
+    ?_assertEqual(
+      #{
+        <<"a">> => 2,
+        <<"b">> => #{<<"c">> => 2},
+        <<"d">> => #{
+          <<"e">> => [#{<<"a">> => 3}, #{<<"b">> => 4}, #{<<"c">> => 5}]
+        }
+      },
+      replace(<<"/a">>, JSON, 2)
+    ),
+    ?_assertEqual(
+      #{
+        <<"a">> => 1,
+        <<"b">> => #{<<"c">> => 3},
+        <<"d">> => #{
+          <<"e">> => [#{<<"a">> => 3}, #{<<"b">> => 4}, #{<<"c">> => 5}]
+        }
+      },
+      replace(<<"/b/c">>, JSON, 3)
+    ),
+    ?_assertEqual(
+      #{
+        <<"a">> => 1,
+        <<"b">> => #{<<"c">> => 2},
+        <<"d">> => #{
+          <<"e">> => [#{<<"a">> => 4}, #{<<"b">> => 4}, #{<<"c">> => 5}]
+        }
+      },
+      replace(<<"/d/e/0/a">>, JSON, 4)
+    ),
+    ?_assertEqual(
+      #{
+        <<"a">> => 1,
+        <<"b">> => #{<<"c">> => 2},
+        <<"d">> => #{
+          <<"e">> => [#{<<"a">> => 3}, #{<<"b">> => 5}, #{<<"c">> => 5}]
+        }
+      },
+      replace(<<"/d/e/1/b">>, JSON, 5)
+    ),
+    ?_assertError(badarg, replace(<<"/e">>, JSON, #{})),
+    ?_assertError(badarg, replace(<<"a">>, JSON, #{})),
+    ?_assertError(badarg, replace(<<"a/">>, JSON, #{})),
+    ?_assertError(badarg, replace(a, JSON, #{})),
+    ?_assertError(badarg, replace(1, JSON, #{}))
   ].
 
 
