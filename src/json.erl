@@ -38,63 +38,63 @@
   | null.
 
 
--spec from_binary(binary()) -> json().
+-spec from_binary(JSON::binary()) -> json().
 
 from_binary(JSON) ->
   try (jsx:decoder(?MODULE, [], []))(JSON)
   catch error:_ -> erlang:error(badarg)
   end.
 
--spec to_binary(json()) -> binary().
+-spec to_binary(JSON::json()) -> binary().
 
 to_binary(JSON) ->
   try jsx:encode(JSON)
   catch error:_ -> erlang:error(badarg)
   end.
 
--spec get(path(), json()) -> json().
+-spec get(Path::path(), JSON::json()) -> json().
 
 get(Path, JSON) ->
   try get0(maybe_decode(Path), JSON)
   catch error:_ -> erlang:error(badarg)
   end.
 
--spec add(path(), json(), json()) -> json().
+-spec add(Path::path(), Value::json(), JSON::json()) -> json().
 
-add(Path, JSON, Value) ->
-  try add0(maybe_decode(Path), JSON, Value)
+add(Path, Value, JSON) ->
+  try add0(maybe_decode(Path), Value, JSON)
   catch error:_ -> erlang:error(badarg)
   end.
 
--spec remove(path(), json()) -> json().
+-spec remove(Path::path(), JSON::json()) -> json().
 
 remove(Path, JSON) ->
   try remove0(maybe_decode(Path), JSON)
   catch error:_ -> erlang:error(badarg)
   end.
 
--spec replace(path(), json(), json()) -> json().
+-spec replace(Path::path(), Value::json(), JSON::json()) -> json().
 
-replace(Path, JSON, Value) ->
-  try add(Path, remove(Path, JSON), Value)
+replace(Path, Value, JSON) ->
+  try add(Path, Value, remove(Path, JSON))
   catch error:_ -> erlang:error(badarg)
   end.
 
--spec copy(path(), path(), json()) -> json().
+-spec copy(From::path(), To::path(), JSON::json()) -> json().
 
 copy(From, To, JSON) ->
   try add(To, JSON, get(From, JSON))
   catch error:_ -> erlang:error(badarg)
   end.
 
--spec move(path(), path(), json()) -> json().
+-spec move(From::path(), To::path(), JSON::json()) -> json().
 
 move(From, To, JSON) ->
   try remove(From, copy(From, To, JSON))
   catch error:_ -> erlang:error(badarg)
   end.
 
--spec test(path(), json()) -> true | false.
+-spec test(Path::path(), JSON::json()) -> true | false.
 
 test(Path, JSON) ->
   try get(Path, JSON), true
@@ -122,30 +122,30 @@ get0([Ref|Rest], JSON)
 when is_binary(Ref), is_list(JSON) ->
   get0([jsonpointer:ref_to_int(Ref)] ++ Rest, JSON).
 
-add0([], _JSON, Value) -> Value;
-add0([Ref], JSON, Value)
+add0([], Value, _JSON) -> Value;
+add0([Ref], Value, JSON)
 when is_binary(Ref), is_map(JSON) ->
   maps:put(Ref, Value, JSON);
-add0([Ref], JSON, Value)
+add0([Ref], Value, JSON)
 when is_integer(Ref), is_list(JSON) ->
   {A, B} = lists:split(Ref, JSON),
   A ++ [Value] ++ B;
-add0([<<"-">>], JSON, Value)
+add0([<<"-">>], Value, JSON)
 when is_list(JSON) ->
   JSON ++ [Value];
-add0([Ref|Rest], JSON, Value)
+add0([Ref|Rest], Value, JSON)
 when is_binary(Ref), is_map(JSON) ->
-  maps:update(Ref, add0(Rest, get([Ref], JSON), Value), JSON);
-add0([Ref|Rest], JSON, Value)
+  maps:update(Ref, add0(Rest, Value, get([Ref], JSON)), JSON);
+add0([Ref|Rest], Value, JSON)
 when is_integer(Ref), is_list(JSON) ->
   {A, [B|C]} = lists:split(Ref, JSON),
-  A ++ [add0(Rest, B, Value)] ++ C;
-add0([Ref|Rest], JSON, Value)
+  A ++ [add0(Rest, Value, B)] ++ C;
+add0([Ref|Rest], Value, JSON)
 when is_atom(Ref), is_map(JSON) ->
-  add0([atom_to_binary(Ref, utf8)] ++ Rest, JSON, Value);
-add0([Ref|Rest], JSON, Value)
+  add0([atom_to_binary(Ref, utf8)] ++ Rest, Value, JSON);
+add0([Ref|Rest], Value, JSON)
 when is_binary(Ref), is_list(JSON) ->
-  add0([jsonpointer:ref_to_int(Ref)] ++ Rest, JSON, Value).
+  add0([jsonpointer:ref_to_int(Ref)] ++ Rest, Value, JSON).
 
 remove0([], _JSON) -> erlang:error(badarg);
 remove0([Ref], JSON)
@@ -304,56 +304,56 @@ get_test_() ->
 
 add_test_() ->
   [
-    ?_assertEqual(<<"foo">>, add(<<>>, #{}, <<"foo">>)),
-    ?_assertEqual(<<"foo">>, add([], #{}, <<"foo">>)),
-    ?_assertEqual(<<"foo">>, add(<<>>, #{<<"bar">> => <<"baz">>}, <<"foo">>)),
-    ?_assertEqual(<<"foo">>, add([], #{<<"bar">> => <<"baz">>}, <<"foo">>)),
+    ?_assertEqual(<<"foo">>, add(<<>>, <<"foo">>, #{})),
+    ?_assertEqual(<<"foo">>, add([], <<"foo">>, #{})),
+    ?_assertEqual(<<"foo">>, add(<<>>, <<"foo">>, #{<<"bar">> => <<"baz">>})),
+    ?_assertEqual(<<"foo">>, add([], <<"foo">>, #{<<"bar">> => <<"baz">>})),
     ?_assertEqual(
       #{<<"foo">> => <<"baz">>},
-      add(<<"/foo">>, #{<<"foo">> => <<"bar">>}, <<"baz">>)
+      add(<<"/foo">>, <<"baz">>, #{<<"foo">> => <<"bar">>})
     ),
     ?_assertEqual(
       #{<<"foo">> => <<"baz">>},
-      add([<<"foo">>], #{<<"foo">> => <<"bar">>}, <<"baz">>)
+      add([<<"foo">>], <<"baz">>, #{<<"foo">> => <<"bar">>})
     ),
     ?_assertEqual(
       #{<<"foo">> => <<"baz">>},
-      add([foo], #{<<"foo">> => <<"bar">>}, <<"baz">>)
+      add([foo], <<"baz">>, #{<<"foo">> => <<"bar">>})
     ),
     ?_assertEqual(
       #{<<"baz">> => <<"qux">>, <<"foo">> => <<"bar">>},
-      add(<<"/baz">>, #{<<"foo">> => <<"bar">>}, <<"qux">>)
+      add(<<"/baz">>, <<"qux">>, #{<<"foo">> => <<"bar">>})
     ),
     ?_assertEqual(
       #{<<"foo">> => [<<"bar">>, <<"qux">>, <<"baz">>]},
-      add(<<"/foo/1">>, #{<<"foo">> => [<<"bar">>, <<"baz">>]}, <<"qux">>)
+      add(<<"/foo/1">>, <<"qux">>, #{<<"foo">> => [<<"bar">>, <<"baz">>]})
     ),
     ?_assertEqual(
       #{<<"foo">> => [<<"bar">>, <<"qux">>, <<"baz">>]},
-      add([<<"foo">>, 1], #{<<"foo">> => [<<"bar">>, <<"baz">>]}, <<"qux">>)
+      add([<<"foo">>, 1], <<"qux">>, #{<<"foo">> => [<<"bar">>, <<"baz">>]})
     ),
     ?_assertEqual(
       #{<<"foo">> => [#{<<"bar">> => 1}]},
-      add(<<"/foo/0/bar">>, #{<<"foo">> => [#{<<"bar">> => 0}]}, 1)
+      add(<<"/foo/0/bar">>, 1, #{<<"foo">> => [#{<<"bar">> => 0}]})
     ),
     ?_assertEqual(
       #{<<"foo">> => [#{<<"bar">> => 1}]},
-      add([<<"foo">>, 0, <<"bar">>], #{<<"foo">> => [#{<<"bar">> => 0}]}, 1)
+      add([<<"foo">>, 0, <<"bar">>], 1, #{<<"foo">> => [#{<<"bar">> => 0}]})
     ),
     ?_assertEqual(
       #{
         <<"foo">> => <<"bar">>,
         <<"child">> => #{<<"grandchild">> => #{}}
       },
-      add(<<"/child">>, #{<<"foo">> => <<"bar">>}, #{<<"grandchild">> => #{}})
+      add(<<"/child">>, #{<<"grandchild">> => #{}}, #{<<"foo">> => <<"bar">>})
     ),
     ?_assertEqual(
       #{<<"foo">> => [<<"bar">>, [<<"abc">>, <<"def">>]]},
-      add(<<"/foo/-">>, #{<<"foo">> => [<<"bar">>]}, [<<"abc">>, <<"def">>])
+      add(<<"/foo/-">>, [<<"abc">>, <<"def">>], #{<<"foo">> => [<<"bar">>]})
     ),
     ?_assertError(
       badarg,
-      add(<<"/baz/bat">>, #{<<"foo">> => <<"bar">>}, <<"qux">>)
+      add(<<"/baz/bat">>, <<"qux">>, #{<<"foo">> => <<"bar">>})
     )
   ].
 
@@ -503,8 +503,8 @@ replace_test_() ->
     }
   },
   [
-    ?_assertError(badarg, replace(<<>>, JSON, #{})),
-    ?_assertError(badarg, replace([], JSON, #{})),
+    ?_assertError(badarg, replace(<<>>, #{}, JSON)),
+    ?_assertError(badarg, replace([], #{}, JSON)),
     ?_assertEqual(
       #{
         <<"a">> => 2,
@@ -513,7 +513,7 @@ replace_test_() ->
           <<"e">> => [#{<<"a">> => 3}, #{<<"b">> => 4}, #{<<"c">> => 5}]
         }
       },
-      replace(<<"/a">>, JSON, 2)
+      replace(<<"/a">>, 2, JSON)
     ),
     ?_assertEqual(
       #{
@@ -523,7 +523,7 @@ replace_test_() ->
           <<"e">> => [#{<<"a">> => 3}, #{<<"b">> => 4}, #{<<"c">> => 5}]
         }
       },
-      replace(<<"/b/c">>, JSON, 3)
+      replace(<<"/b/c">>, 3, JSON)
     ),
     ?_assertEqual(
       #{
@@ -533,7 +533,7 @@ replace_test_() ->
           <<"e">> => [#{<<"a">> => 4}, #{<<"b">> => 4}, #{<<"c">> => 5}]
         }
       },
-      replace(<<"/d/e/0/a">>, JSON, 4)
+      replace(<<"/d/e/0/a">>, 4, JSON)
     ),
     ?_assertEqual(
       #{
@@ -543,13 +543,13 @@ replace_test_() ->
           <<"e">> => [#{<<"a">> => 3}, #{<<"b">> => 5}, #{<<"c">> => 5}]
         }
       },
-      replace(<<"/d/e/1/b">>, JSON, 5)
+      replace(<<"/d/e/1/b">>, 5, JSON)
     ),
-    ?_assertError(badarg, replace(<<"/e">>, JSON, #{})),
-    ?_assertError(badarg, replace(<<"a">>, JSON, #{})),
-    ?_assertError(badarg, replace(<<"a/">>, JSON, #{})),
-    ?_assertError(badarg, replace(a, JSON, #{})),
-    ?_assertError(badarg, replace(1, JSON, #{}))
+    ?_assertError(badarg, replace(<<"/e">>, #{}, JSON)),
+    ?_assertError(badarg, replace(<<"a">>, #{}, JSON)),
+    ?_assertError(badarg, replace(<<"a/">>, #{}, JSON)),
+    ?_assertError(badarg, replace(a, #{}, JSON)),
+    ?_assertError(badarg, replace(1, #{}, JSON))
   ].
 
 
