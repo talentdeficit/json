@@ -29,17 +29,17 @@ If you are developing with multiple Erlang releases, take a look at [erlenv][erl
 * [quickstart](#quickstart)
 * [description](#description)
 * [data types](#data-types)
-  - [`path()`](#path)
-  - [`json()`](#json)
+  - [`path()`](#path-type)
+  - [`json()`](#json-type)
 * [exports](#exports)
-  - [`from_binary/1 and to_binary/1`](#from_binary1_and_to_binary1)
+  - [`from_binary/1 and to_binary/1`](#from_binary1-and-to_binary1)
   - [`get/1,2`](#get12)
   - [`add/2,3`](#add23)
   - [`remove/1,2`](#remove12)
   - [`replace/2,3`](#replace23)
   - [`copy/2,3`](#copy23)
   - [`move/2,3`](#move23)
-  - [`test/1,2`](test12)
+  - [`test/1,2`](#test12)
   - [`fold/2`](#fold2)
   - [`keys/2`](#keys2)
 * [callback exports](#callback_exports)
@@ -142,10 +142,10 @@ More info to come.
 
 ## data types ##
 
-#### `path()` ####
+#### `path() type` ####
 path() :: binary() | [atom() | integer() | binary()]
 
-#### `json()` ####
+#### `json() type` ####
 json() :: #{integer() | atom() | binary() => json()}
   | [json()]
   | integer()
@@ -173,6 +173,7 @@ get/1
 ```erlang
 add/3
 add/2
+```
 
 ### remove/1,2 ###
 ```erlang
@@ -213,13 +214,19 @@ fold/2
 ```erlang
 keys/2
 ```
-## otp callback exports ##
+## callback exports ##
 the following should be exported from a json callback module
 
-```erlang
+#### Module:init/1 ####
+
 init/1
+
+#### Module:handle_event/2 ####
+
 handle_event/2
-```
+
+
+
 ## acknowledgements ##
 tdeficit for originally doing all the hard work
 bobthenameless for helping with documentation
