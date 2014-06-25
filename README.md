@@ -62,16 +62,18 @@ convert between json() and binary() erlang types.
 `ExampleJSON` will be used as an example JSON input for the rest of the quickstart.
 
 ```erlang
-1> ExampleJSON = json:from_binary(<<"{\"library\": \"jsx\", \"awesome\": true, \"list\": [{\"a\": 1}, {\"b\": 2}, {\"c\": 3} ]}">>).
+
+1> ExampleJSON = json:from_binary(<<"{\"library\": \"jsx\", \"awesome\": true,
+1> \"list\": [{\"a\": 1}, {\"b\": 2}, {\"c\": 3} ]}">>).
 #{<<"awesome">> => true,
-  <<"library">> => <<"jsx">>,
+  <<"library">> => <<"json">>,
   <<"list">> => [#{<<"a">> => 1},#{<<"b">> => 2},#{<<"c">> => 3}]}
   
 ```
 
 ```erlang
 2> json:to_binary(ExampleJSON).
-<<"{\"awesome\":true,\"library\":\"jsx\",\"list\":[{\"a\":1},{\"b\":2},{\"c\":3}]}">>
+<<"{\"awesome\":true,\"library\":\"json\",\"list\":[{\"a\":1},{\"b\":2},{\"c\":3}]}">>
 ```
 
 
@@ -98,25 +100,26 @@ true
 2> json:add([addition], <<"1+1" >>, ExampleJSON).
 #{<<"addition">> => <<"1+1">>,
   <<"awesome">> => true,
-  <<"library">> => <<"jsx">>,
+  <<"library">> => <<"json">>,
   <<"list">> => [#{<<"a">> => 1},#{<<"b">> => 2},#{<<"c">> => 3}]}
   
-3> json:add([recursion], ExampleJSON, ExampleJSON).   #{<<"awesome">> => true,
-  <<"library">> => <<"jsx">>,
+3> json:add([recursion], ExampleJSON, ExampleJSON).
+#{<<"awesome">> => true,
+  <<"library">> => <<"json">>,
   <<"list">> => [#{<<"a">> => 1},#{<<"b">> => 2},#{<<"c">> => 3}],
   <<"recursion">> => #{<<"awesome">> => true,
-    <<"library">> => <<"jsx">>,
+    <<"library">> => <<"json">>,
     <<"list">> => [#{<<"a">> => 1},#{<<"b">> => 2},#{<<"c">> => 3}]}}
 
 4> json:add([map], #{<<"test2">> => 50}, ExampleJSON).                                  
 #{<<"awesome">> => true,
-  <<"library">> => <<"jsx">>,
+  <<"library">> => <<"json">>,
   <<"list">> => [#{<<"a">> => 1},#{<<"b">> => 2},#{<<"c">> => 3}],
   <<"map">> => #{<<"test2">> => 50}}
 
 5> json:add(<<"/listtest">>, [50, <<"listadd">>, testatom], ExampleJSON).
 #{<<"awesome">> => true,
-  <<"library">> => <<"jsx">>,
+  <<"library">> => <<"json">>,
   <<"list">> => [#{<<"a">> => 1},#{<<"b">> => 2},#{<<"c">> => 3}],
   <<"listtest">> => [50,<<"listadd">>,testatom]}
 ```
@@ -126,7 +129,7 @@ true
 ```erlang
 2> json:remove([list, 2], ExampleJSON).
 #{<<"awesome">> => true,
-  <<"library">> => <<"jsx">>,
+  <<"library">> => <<"json">>,
   <<"list">> => [#{<<"a">> => 1},#{<<"b">> => 2}]}
 
 ```
@@ -136,7 +139,7 @@ true
 ```erlang
 2> json:replace([awesome], <<"json in erlang!">> ,ExampleJSON).                                                      
 #{<<"awesome">> => <<"json in erlang!">>,
-  <<"library">> => <<"jsx">>,
+  <<"library">> => <<"json">>,
   <<"list">> => [#{<<"a">> => 1},#{<<"b">> => 2},#{<<"c">> => 3}]}
 
 ```
@@ -147,7 +150,7 @@ true
 json:copy([list],[copiedlist],ExampleJSON).
 #{<<"awesome">> => true,
   <<"copiedlist">> => [#{<<"a">> => 1},#{<<"b">> => 2},#{<<"c">> => 3}], 
-  <<"library">> => <<"jsx">>,
+  <<"library">> => <<"json">>,
   <<"list">> => [#{<<"a">> => 1},#{<<"b">> => 2},#{<<"c">> => 3}]}
 
 ```
@@ -157,7 +160,7 @@ json:copy([list],[copiedlist],ExampleJSON).
 2> json:move([library], [newlibrary], ExampleJSON).
 #{<<"awesome">> => true,
   <<"list">> => [#{<<"a">> => 1},#{<<"b">> => 2},#{<<"c">> => 3}],
-  <<"newlibrary">> => <<"jsx">>}
+  <<"newlibrary">> => <<"json">>}
 
 ```
 
@@ -166,9 +169,14 @@ json:copy([list],[copiedlist],ExampleJSON).
 #### fold function over json at supplied json path ####
 
 ```erlang
-2> json:fold([json:get([]), json:get([list]), json:remove([0]), json:replace([1, c], <<"end of fold">> )], ExampleJSON).
+2> json:fold([json:get([]), json:get([list]),
+2> json:remove([0]), json:replace([1, c],
+2> <<"end of fold">> )], ExampleJSON).
 [#{<<"b">> => 2},#{<<"c">> => <<"end of fold">>}]
-3> json:fold([json:get([]), json:get([list]), json:remove([0]), json:replace([1, c], <<"123456789">> ), json:get([1, c]), fun binary:bin_to_list/1, fun string:len/1], ExampleJSON).
+
+3> json:fold([json:get([]), json:get([list]),
+3> json:remove([0]), json:replace([1, c], <<"123456789">> ),
+3> json:get([1, c]), fun binary:bin_to_list/1, fun string:len/1], ExampleJSON).
 9
 
 
