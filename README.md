@@ -42,7 +42,7 @@ If you are developing with multiple Erlang releases, take a look at [erlenv][erl
   - [`test/1,2`](#test12)
   - [`fold/2`](#fold2)
   - [`keys/2`](#keys2)
-* [callback exports](#callback_exports)
+* [callback exports](#callback-exports)
   - [`Module:init/1`](#moduleinit1)
   - [`Module:handle_event/2`](#modulehandle_event2)
 * [acknowledgements](#acknowledgements)
