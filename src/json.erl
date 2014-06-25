@@ -24,8 +24,8 @@
 -compile({no_auto_import,[get/1]}).
 
 -export([from_binary/1, to_binary/1]).
--export([get/2, add/3, remove/2, replace/3, copy/3, move/3, test/2]).
--export([get/1, add/2, remove/1, replace/2, copy/2, move/2, test/1]).
+-export([get/2, add/3, remove/2, replace/3, copy/3, move/3, test/3]).
+-export([get/1, add/2, remove/1, replace/2, copy/2, move/2, test/2]).
 -export([fold/2, keys/2]).
 -export([init/1, handle_event/2]).
 
@@ -121,15 +121,15 @@ move(From, To, JSON) ->
 move(From, To) -> fun(JSON) -> move(From, To, JSON) end.
 
 
--spec test(Path::path(), JSON::json()) -> json().
--spec test(Path::path()) -> fun((JSON::json()) -> json()).
+-spec test(Path::path(), Value::json(), JSON::json()) -> json().
+-spec test(Path::path(), Value::json()) -> fun((JSON::json()) -> json()).
 
-test(Path, JSON) ->
-  try get(Path, JSON), JSON
+test(Path, Value, JSON) ->
+  try Get = get(Path, JSON), Get = Value, JSON
   catch error:_ -> erlang:error(badarg)
   end.
 
-test(Path) -> fun(JSON) -> test(Path, JSON) end.
+test(Path, Value) -> fun(JSON) -> test(Path, Value, JSON) end.
 
 
 -spec fold([function()], JSON::json()) -> json().
@@ -600,15 +600,15 @@ test_test_() ->
     <<"a">> => 1,
     <<"b">> => #{<<"c">> => 2},
     <<"d">> => #{
-      <<"e">> => [#{<<"a">> => 3}, #{<<"b">> => 4}, #{<<"c">> => 5}]
+      <<"e">> => [#{<<"a">> => 3}, #{<<"b">> => 4}]
     }
   },
   [
-    ?_assertEqual(JSON, test(<<"/a">>, JSON)),
-    ?_assertEqual(JSON, test(<<"/b/c">>, JSON)),
-    ?_assertEqual(JSON, test(<<"/d/e/0/a">>, JSON)),
-    ?_assertEqual(JSON, test(<<"/d/e/1/b">>, JSON)),
-    ?_assertError(badarg, test(<<"/e">>, JSON))
+    ?_assertEqual(JSON, test(<<"/a">>, 1, JSON)),
+    ?_assertEqual(JSON, test(<<"/b/c">>, 2, JSON)),
+    ?_assertEqual(JSON, test(<<"/d/e/0/a">>, 3, JSON)),
+    ?_assertEqual(JSON, test(<<"/d/e/1/b">>, 4, JSON)),
+    ?_assertError(badarg, test(<<"/e">>, false, JSON))
   ].
 
 
@@ -618,9 +618,9 @@ fold_test_() ->
     ?_assertEqual(
       JSON,
       fold([
-        test(<<"/foo">>),
+        test(<<"/foo">>, <<"bar">>),
         copy(<<"/foo">>, <<"/qux">>),
-        test(<<"/qux">>),
+        test(<<"/qux">>, <<"bar">>),
         replace(<<"/qux">>, <<"baz">>),
         remove(<<"/foo">>),
         move(<<"/qux">>, <<"/foo">>),
