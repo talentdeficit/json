@@ -22,7 +22,7 @@ If you are developing with multiple Erlang releases, take a look at [erlenv][erl
 
 [jsx][jsx] is used when converting between Erlang binary() and json() types (? verify this is true later)
 
-[jsonpointer][jsonpointer] is used for handling json pointer syntax in accordance with [RFC6901][rfc6901].
+[jsonpointer][jsonpointer] is used for handling json paths in accordance with [RFC6901][rfc6901].
 
 ## index ##
 
@@ -57,80 +57,127 @@ $ rebar eunit
 ```
 
 #### conversion between json and utf8 binaries####
-uses jsx
+convert between json() and binary() erlang types.
+
+`ExampleJSON` will be used as an example JSON input for the rest of the quickstart.
 
 ```erlang
-to_binary/1
+1> ExampleJSON = json:from_binary(<<"{\"library\": \"jsx\", \"awesome\": true, \"list\": [{\"a\": 1}, {\"b\": 2}, {\"c\": 3} ]}">>).
+#{<<"awesome">> => true,
+  <<"library">> => <<"jsx">>,
+  <<"list">> => [#{<<"a">> => 1},#{<<"b">> => 2},#{<<"c">> => 3}]}
+  
 ```
 
 ```erlang
-from_binary/1
+2> json:to_binary(ExampleJSON).
+<<"{\"awesome\":true,\"library\":\"jsx\",\"list\":[{\"a\":1},{\"b\":2},{\"c\":3}]}">>
 ```
+
 
 #### get json at supplied json path ####
 
 
 ```erlang
-get/1
-get/2
+%% get/1 returns a function accepting json(), get/2 returns the json() object at the given path.
+%% other functions with differing arity perform similarly.
+
+2> GetJSONFun = json:get([list, 0, a]). % supplying a list as a path
+#Fun<json.0.18938731>
+3> GetJSONFun(ExampleJSON).
+1
+4> json:get(<<"/list/0/a">>, ExampleJSON). % can also give path as a binary JSON pointer
+1
+5> json:get([awesome], ExampleJSON).      
+true
 ```
 
 #### add json to supplied json path ####
 
 ```erlang
-add/2
-add/3
+2> json:add([addition], <<"1+1" >>, ExampleJSON).
+#{<<"addition">> => <<"1+1">>,
+  <<"awesome">> => true,
+  <<"library">> => <<"jsx">>,
+  <<"list">> => [#{<<"a">> => 1},#{<<"b">> => 2},#{<<"c">> => 3}]}
+  
+3> json:add([recursion], ExampleJSON, ExampleJSON).   #{<<"awesome">> => true,
+  <<"library">> => <<"jsx">>,
+  <<"list">> => [#{<<"a">> => 1},#{<<"b">> => 2},#{<<"c">> => 3}],
+  <<"recursion">> => #{<<"awesome">> => true,
+    <<"library">> => <<"jsx">>,
+    <<"list">> => [#{<<"a">> => 1},#{<<"b">> => 2},#{<<"c">> => 3}]}}
+
+4> json:add([map], #{<<"test2">> => 50}, ExampleJSON).                                  
+#{<<"awesome">> => true,
+  <<"library">> => <<"jsx">>,
+  <<"list">> => [#{<<"a">> => 1},#{<<"b">> => 2},#{<<"c">> => 3}],
+  <<"map">> => #{<<"test2">> => 50}}
+
+5> json:add(<<"/listtest">>, [50, <<"listadd">>, testatom], ExampleJSON).
+#{<<"awesome">> => true,
+  <<"library">> => <<"jsx">>,
+  <<"list">> => [#{<<"a">> => 1},#{<<"b">> => 2},#{<<"c">> => 3}],
+  <<"listtest">> => [50,<<"listadd">>,testatom]}
 ```
 
 #### remove json at supplied json path ####
 
 ```erlang
-remove/1
-remove/2
+2> json:remove([list, 2], ExampleJSON).
+#{<<"awesome">> => true,
+  <<"library">> => <<"jsx">>,
+  <<"list">> => [#{<<"a">> => 1},#{<<"b">> => 2}]}
+
 ```
 
 #### replace json at supplied json path with new json####
 
 ```erlang
-replace/2
-replace/3
+2> json:replace([awesome], <<"json in erlang!">> ,ExampleJSON).                                                      
+#{<<"awesome">> => <<"json in erlang!">>,
+  <<"library">> => <<"jsx">>,
+  <<"list">> => [#{<<"a">> => 1},#{<<"b">> => 2},#{<<"c">> => 3}]}
 
 ```
 
 #### copy json from one json path to another ####
 
 ```erlang
-copy/2
-copy/3
+json:copy([list],[copiedlist],ExampleJSON).
+#{<<"awesome">> => true,
+  <<"copiedlist">> => [#{<<"a">> => 1},#{<<"b">> => 2},#{<<"c">> => 3}], 
+  <<"library">> => <<"jsx">>,
+  <<"list">> => [#{<<"a">> => 1},#{<<"b">> => 2},#{<<"c">> => 3}]}
 
 ```
 #### move json from one json path to another ####
 
 ```erlang
-move/2
-move/3
+2> json:move([library], [newlibrary], ExampleJSON).
+#{<<"awesome">> => true,
+  <<"list">> => [#{<<"a">> => 1},#{<<"b">> => 2},#{<<"c">> => 3}],
+  <<"newlibrary">> => <<"jsx">>}
 
 ```
 
-#### test json existance at supplied json path ####
 
-```erlang
-test/1
-test/2
-
-```
 
 #### fold function over json at supplied json path ####
 
 ```erlang
-fold/2
+2> json:fold([json:get([]), json:get([list]), json:remove([0]), json:replace([1, c], <<"end of fold">> )], ExampleJSON).
+[#{<<"b">> => 2},#{<<"c">> => <<"end of fold">>}]
+3> json:fold([json:get([]), json:get([list]), json:remove([0]), json:replace([1, c], <<"123456789">> ), json:get([1, c]), fun binary:bin_to_list/1, fun string:len/1], ExampleJSON).
+9
 
 
 ```
 #### return json keys at supplied json path ####
 
 ```erlang
-keys/2
+2> json:keys([], ExampleJSON).                   
+[<<"awesome">>,<<"library">>,<<"list">>]
 
 ```
 
