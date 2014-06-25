@@ -26,7 +26,7 @@
 -export([from_binary/1, to_binary/1]).
 -export([get/2, add/3, remove/2, replace/3, copy/3, move/3, test/2]).
 -export([get/1, add/2, remove/1, replace/2, copy/2, move/2, test/1]).
--export([fold/2]).
+-export([fold/2, keys/2]).
 -export([init/1, handle_event/2]).
 
 
@@ -136,6 +136,13 @@ test(Path) -> fun(JSON) -> test(Path, JSON) end.
 
 fold(Funs, JSON) -> lists:foldl(fun(Fun, IR) -> Fun(IR) end, JSON, Funs).
 
+
+-spec keys(Path::path(), JSON::json()) -> [binary()].
+
+keys(Path, JSON) ->
+  try maps:keys(get(Path, JSON))
+  catch error:_ -> erlang:error(badarg)
+  end.
 
 % internal functions
 
@@ -621,6 +628,17 @@ fold_test_() ->
         get(<<"/foo">>)
       ], JSON)
     )
+  ].
+
+
+keys_test_() ->
+  [
+    ?_assertEqual([<<"bar">>, <<"foo">>], keys(<<>>, #{<<"foo">> => 1, <<"bar">> => 1})),
+    ?_assertEqual([<<"bar">>, <<"baz">>], keys(
+      <<"/foo">>,
+      #{<<"foo">> => #{<<"bar">> => true, <<"baz">> => true}}
+    )),
+    ?_assertError(badarg, keys(<<>>, [1,2,3]))
   ].
 
 
