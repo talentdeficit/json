@@ -48,12 +48,14 @@ from_binary(JSON) ->
   catch error:_ -> erlang:error(badarg)
   end.
 
+
 -spec to_binary(JSON::json()) -> binary().
 
 to_binary(JSON) ->
   try jsx:encode(JSON)
   catch error:_ -> erlang:error(badarg)
   end.
+
 
 -spec get(Path::path(), JSON::json()) -> json().
 -spec get(Path::path()) -> fun((JSON::json()) -> json()).
@@ -149,10 +151,12 @@ keys(Path, JSON) ->
   catch error:_ -> erlang:error(badarg)
   end.
 
+
 % internal functions
 
 maybe_decode(Path) when is_list(Path) -> Path;
 maybe_decode(Path) when is_binary(Path) -> jsonpointer:decode(Path).
+
 
 get0([], JSON) -> JSON;
 get0([Ref|Rest], JSON)
@@ -168,6 +172,7 @@ when is_integer(Ref), is_list(JSON) ->
 get0([Ref|Rest], JSON)
 when is_binary(Ref), is_list(JSON) ->
   get0([jsonpointer:ref_to_int(Ref)] ++ Rest, JSON).
+
 
 add0([], Value, _JSON) -> Value;
 add0([Ref], Value, JSON)
@@ -194,6 +199,7 @@ add0([Ref|Rest], Value, JSON)
 when is_binary(Ref), is_list(JSON) ->
   add0([jsonpointer:ref_to_int(Ref)] ++ Rest, Value, JSON).
 
+
 remove0([], _JSON) -> erlang:error(badarg);
 remove0([Ref], JSON)
 when is_binary(Ref), is_map(JSON) ->
@@ -219,14 +225,17 @@ remove0([Ref|Rest], JSON)
 when is_binary(Ref), is_list(JSON) ->
   remove0([jsonpointer:ref_to_int(Ref)] ++ Rest, JSON).
 
+
 replace0([], Value, _JSON) -> Value;
 replace0(Path, Value, JSON) -> add(Path, Value, remove(Path, JSON)).
+
 
 move0([], To, JSON) when is_map(JSON) -> add(To, JSON, #{});
 move0([], To, JSON) when is_list(JSON) -> add(To, JSON, []);
 move0(From, To, JSON) ->
   Value = get(From, JSON),
   add(To, Value, remove(From, JSON)).
+
 
 patch0(Ops, JSON) ->
   fold([ case maps:get(<<"op">>, Op) of
@@ -262,6 +271,7 @@ patch0(Ops, JSON) ->
 -spec init([]) -> state().
 
 init([]) -> [].
+
 
 -spec handle_event(Event::any(), State::state()) -> state().
 
@@ -693,6 +703,7 @@ patch_test_() ->
       )
     )
   ].
+
 
 fold_test_() ->
   JSON = #{<<"foo">> => <<"bar">>},
