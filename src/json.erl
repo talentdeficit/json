@@ -92,7 +92,7 @@ remove(Path) -> fun(JSON) -> remove(Path, JSON) end.
 -spec replace(Path::path(), Value::json()) -> fun((JSON::json()) -> json()).
 
 replace(Path, Value, JSON) ->
-  try replace0(Path, Value, JSON)
+  try replace0(maybe_decode(Path), Value, JSON)
   catch error:_ -> erlang:error(badarg)
   end.
 
@@ -220,7 +220,6 @@ when is_binary(Ref), is_list(JSON) ->
   remove0([jsonpointer:ref_to_int(Ref)] ++ Rest, JSON).
 
 replace0([], Value, _JSON) -> Value;
-replace0(<<>>, Value, _JSON) -> Value;
 replace0(Path, Value, JSON) -> add(Path, Value, remove(Path, JSON)).
 
 move0([], To, JSON) when is_map(JSON) -> add(To, JSON, #{});
