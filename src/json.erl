@@ -26,7 +26,7 @@
 -export([from_binary/1, to_binary/1]).
 -export([get/2, add/3, remove/2, replace/3, copy/3, move/3, test/3]).
 -export([get/1, add/2, remove/1, replace/2, copy/2, move/2, test/2]).
--export([fold/2, keys/2]).
+-export([patch/2, fold/2, keys/2]).
 -export([init/1, handle_event/2]).
 
 
@@ -134,6 +134,11 @@ test(Path, Value, JSON) ->
 test(Path, Value) -> fun(JSON) -> test(Path, Value, JSON) end.
 
 
+-spec patch(Ops::[map()], JSON::json()) -> json().
+
+patch(Ops, JSON) -> patch0(Ops, JSON).
+
+
 -spec fold([function()], JSON::json()) -> json().
 
 fold(Funs, JSON) -> lists:foldl(fun(Fun, IR) -> Fun(IR) end, JSON, Funs).
@@ -219,6 +224,40 @@ when is_binary(Ref), is_list(JSON) ->
 replace0([], Value, _JSON) -> Value;
 replace0(<<>>, Value, _JSON) -> Value;
 replace0(Path, Value, JSON) -> add(Path, Value, remove(Path, JSON)).
+
+move0([], To, JSON) when is_map(JSON) -> add(To, JSON, #{});
+move0([], To, JSON) when is_list(JSON) -> add(To, JSON, []);
+move0(From, To, JSON) ->
+  Value = get(From, JSON),
+  add(To, Value, remove(From, JSON)).
+
+patch0(Ops, JSON) ->
+  fold([ case maps:get(<<"op">>, Op) of
+    <<"add">> ->
+      Path = maps:get(<<"path">>, Op),
+      Value = maps:get(<<"value">>, Op),
+      json:add(Path, Value);
+    <<"remove">> ->
+      Path = maps:get(<<"path">>, Op),
+      json:remove(Path);
+    <<"replace">> ->
+      Path = maps:get(<<"path">>, Op),
+      Value = maps:get(<<"value">>, Op),
+      json:replace(Path, Value);
+    <<"copy">> ->
+      Path = maps:get(<<"path">>, Op),
+      From = maps:get(<<"from">>, Op),
+      json:copy(From, Path);
+    <<"move">> ->
+      Path = maps:get(<<"path">>, Op),
+      From = maps:get(<<"from">>, Op),
+      json:move(From, Path);
+    <<"test">> ->
+      Path = maps:get(<<"path">>, Op),
+      Value = maps:get(<<"value">>, Op),
+      json:test(Path, Value)
+  end || Op <- Ops ], JSON).
+
 
 % replace the decode backend of jsx with one that produces maps
 
@@ -618,21 +657,39 @@ test_test_() ->
   ].
 
 
+patch_test_() ->
+  JSON = #{<<"foo">> => <<"bar">>},
+  [
+    ?_assertEqual(
+      #{<<"foo">> => <<"baz">>},
+      patch([
+          #{<<"op">> => <<"test">>, <<"path">> => <<"/foo">>, <<"value">> => <<"bar">>},
+          #{<<"op">> => <<"copy">>, <<"from">> => <<"/foo">>, <<"path">> => <<"/qux">>},          
+          #{<<"op">> => <<"test">>, <<"path">> => <<"/qux">>, <<"value">> => <<"bar">>},
+          #{<<"op">> => <<"replace">>, <<"path">> => <<"/qux">>, <<"value">> => <<"baz">>},
+          #{<<"op">> => <<"remove">>, <<"path">> => <<"/foo">>},
+          #{<<"op">> => <<"move">>, <<"from">> => <<"/qux">>, <<"path">> => <<"/foo">>},
+          #{<<"op">> => <<"test">>, <<"path">> => <<"/foo">>, <<"value">> => <<"baz">>}
+        ], JSON
+      )
+    )
+  ].
+
 fold_test_() ->
   JSON = #{<<"foo">> => <<"bar">>},
   [
     ?_assertEqual(
-      JSON,
+      #{<<"foo">> => <<"baz">>},
       fold([
-        test(<<"/foo">>, <<"bar">>),
-        copy(<<"/foo">>, <<"/qux">>),
-        test(<<"/qux">>, <<"bar">>),
-        replace(<<"/qux">>, <<"baz">>),
-        remove(<<"/foo">>),
-        move(<<"/qux">>, <<"/foo">>),
-        replace(<<"/foo">>, JSON),
-        get(<<"/foo">>)
-      ], JSON)
+          test(<<"/foo">>, <<"bar">>),
+          copy(<<"/foo">>, <<"/qux">>),
+          test(<<"/qux">>, <<"bar">>),
+          replace(<<"/qux">>, <<"baz">>),
+          remove(<<"/foo">>),
+          move(<<"/qux">>, <<"/foo">>),
+          test(<<"/foo">>, <<"baz">>)
+        ], JSON
+      )
     )
   ].
 
