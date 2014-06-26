@@ -114,7 +114,9 @@ copy(From, To) -> fun(JSON) -> copy(From, To, JSON) end.
 -spec move(From::path(), To::path()) -> fun((JSON::json()) -> json()).
 
 move(From, To, JSON) ->
-  try remove(From, copy(From, To, JSON))
+  try
+    Value = get(From, JSON),
+    add(To, Value, remove(From, JSON))
   catch error:_ -> erlang:error(badarg)
   end.
 
