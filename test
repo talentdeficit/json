@@ -1,0 +1,36 @@
+#!/usr/bin/env escript
+%% -*- erlang -*-
+%%! -smp enable -pa deps/jsx/ebin -pa deps/jsonpointer/ebin -pa ebin
+
+-mode(compile).
+-include_lib("eunit/include/eunit.hrl").
+
+main(Args) ->
+  EUnitArgs = case Args of ["-v"] -> [verbose]; _ -> [] end,
+  {ok, TestsBin} = file:read_file("./deps/json_patch_tests/tests.json"),
+  {ok, SpecTestsBin} = file:read_file("./deps/json_patch_tests/spec_tests.json"),
+  Tests = json:from_binary(TestsBin) ++ json:from_binary(SpecTestsBin),
+  eunit:test(lists:map(
+    fun(Test) -> do(Test) end,
+    lists:dropwhile(fun(Map) ->
+      case maps:find(<<"disabled">>, Map) of
+        {ok, true} -> true;
+        error -> false
+      end
+    end, Tests)
+  ), EUnitArgs).
+
+do(Test) ->
+  try maps:get(<<"error">>, Test), ?_assertError(badarg, patch(Test))
+  catch error:bad_key -> ?_assertEqual(expected(Test), patch(Test))
+  end.
+
+patch(Test) ->
+  Patch = maps:get(<<"patch">>, Test),
+  Doc = maps:get(<<"doc">>, Test),
+  json:patch(Patch, Doc).
+
+expected(Test) ->
+  try maps:get(<<"expected">>, Test)
+  catch error:bad_key -> maps:get(<<"doc">>, Test)
+  end.
