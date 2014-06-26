@@ -92,7 +92,7 @@ remove(Path) -> fun(JSON) -> remove(Path, JSON) end.
 -spec replace(Path::path(), Value::json()) -> fun((JSON::json()) -> json()).
 
 replace(Path, Value, JSON) ->
-  try add(Path, Value, remove(Path, JSON))
+  try replace0(Path, Value, JSON)
   catch error:_ -> erlang:error(badarg)
   end.
 
@@ -215,6 +215,10 @@ when is_atom(Ref), is_map(JSON) ->
 remove0([Ref|Rest], JSON)
 when is_binary(Ref), is_list(JSON) ->
   remove0([jsonpointer:ref_to_int(Ref)] ++ Rest, JSON).
+
+replace0([], Value, _JSON) -> Value;
+replace0(<<>>, Value, _JSON) -> Value;
+replace0(Path, Value, JSON) -> add(Path, Value, remove(Path, JSON)).
 
 % replace the decode backend of jsx with one that produces maps
 
@@ -547,8 +551,8 @@ replace_test_() ->
     }
   },
   [
-    ?_assertError(badarg, replace(<<>>, #{}, JSON)),
-    ?_assertError(badarg, replace([], #{}, JSON)),
+    ?_assertEqual(#{}, replace(<<>>, #{}, JSON)),
+    ?_assertEqual(#{}, replace([], #{}, JSON)),
     ?_assertEqual(
       #{
         <<"a">> => 2,
