@@ -114,9 +114,7 @@ copy(From, To) -> fun(JSON) -> copy(From, To, JSON) end.
 -spec move(From::path(), To::path()) -> fun((JSON::json()) -> json()).
 
 move(From, To, JSON) ->
-  try
-    Value = get(From, JSON),
-    add(To, Value, remove(From, JSON))
+  try move0(maybe_decode(From), maybe_decode(To), JSON)
   catch error:_ -> erlang:error(badarg)
   end.
 
@@ -637,6 +635,28 @@ replace_test_() ->
     ?_assertError(badarg, replace(<<"a/">>, #{}, JSON)),
     ?_assertError(badarg, replace(a, #{}, JSON)),
     ?_assertError(badarg, replace(1, #{}, JSON))
+  ].
+
+
+copy_test_() ->
+  JSON = #{<<"foo">> => <<"bar">>},
+  [
+    ?_assertEqual(JSON, copy([foo], [foo], JSON)),
+    ?_assertEqual(#{<<"foo">> => JSON}, copy([], [foo], JSON)),
+    ?_assertEqual([[1], 1], copy([], [0], [1])),
+    ?_assertEqual(#{<<"foo">> => <<"bar">>, <<"qux">> => <<"bar">>}, copy([foo], [qux], JSON)),
+    ?_assertError(badarg, copy([qux], [foo], JSON))
+  ].
+
+
+move_test_() ->
+  JSON = #{<<"foo">> => <<"bar">>},
+  [
+    ?_assertEqual(JSON, move([foo], [foo], JSON)),
+    ?_assertEqual(#{<<"foo">> => JSON}, move([], [foo], JSON)),
+    ?_assertEqual([[1]], move([], [0], [1])),
+    ?_assertEqual(#{<<"qux">> => <<"bar">>}, move([foo], [qux], JSON)),
+    ?_assertError(badarg, move([qux], [foo], JSON))
   ].
 
 
