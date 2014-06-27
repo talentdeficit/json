@@ -325,6 +325,8 @@ insert(_, _) -> erlang:error(badarg).
 -include_lib("eunit/include/eunit.hrl").
 
 
+encode_test_() -> [{"empty object", ?_assertEqual(<<"{}">>, to_binary(#{}))}].
+
 decode_test_() ->
   [
     {"empty object", ?_assertEqual(#{}, from_binary(<<"{}">>))},
