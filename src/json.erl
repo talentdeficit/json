@@ -21,11 +21,11 @@
 %% THE SOFTWARE.
 
 -module(json).
--compile({no_auto_import,[get/1]}).
+-compile({no_auto_import,[get/1, apply/3]}).
 
 -export([from_binary/1, to_binary/1]).
--export([get/2, add/3, remove/2, replace/3, copy/3, move/3, test/3]).
--export([get/1, add/2, remove/1, replace/2, copy/2, move/2, test/2]).
+-export([get/2, add/3, remove/2, replace/3, copy/3, move/3, test/3, apply/3]).
+-export([get/1, add/2, remove/1, replace/2, copy/2, move/2, test/2, apply/2]).
 -export([patch/2, fold/2, keys/2]).
 -export([init/1, handle_event/2]).
 
@@ -132,6 +132,17 @@ test(Path, Value, JSON) ->
   end.
 
 test(Path, Value) -> fun(JSON) -> test(Path, Value, JSON) end.
+
+
+-spec apply(Path::path(), Fun::function(), JSON::json()) -> json().
+-spec apply(Path::path(), Fun::function()) -> fun((JSON::json()) -> json()).
+
+apply(Path, Fun, JSON) ->
+  try replace(Path, Fun(get(Path, JSON)), JSON)
+  catch error:_ -> erlang:error(badarg)
+  end.
+
+apply(Path, Fun) -> fun(JSON) -> apply(Path, Fun, JSON) end.
 
 
 -spec patch(Ops::[map()], JSON::json()) -> json().
@@ -685,6 +696,14 @@ test_test_() ->
     ?_assertEqual(JSON, test(<<"/d/e/0/a">>, 3, JSON)),
     ?_assertEqual(JSON, test(<<"/d/e/1/b">>, 4, JSON)),
     ?_assertError(badarg, test(<<"/e">>, false, JSON))
+  ].
+
+
+apply_test_() ->
+  [
+    ?_assertEqual(#{<<"key">> => false}, apply(<<"/key">>, fun(true) -> false end, #{<<"key">> => true})),
+    ?_assertError(badarg, apply(<<"/nokey">>, fun(_) -> ok end, #{})),
+    ?_assertError(badarg, apply(<<"/key">>, fun(_) -> erlang:error(noerror) end, #{<<"key">> => true}))
   ].
 
 
