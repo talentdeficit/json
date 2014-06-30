@@ -15,7 +15,7 @@ copyright 2010-2014 alisdair sullivan
 
 Erlang 17.0+ is required to use this library due to the new map implementation.
 
-If you are developing with multiple Erlang releases, take a look at [erlenv][erlenv]. It is an erlang release management tool forked from [rbenv][rbenv[ and can be used to easily manage multiple releases of Erlang/OTP.
+If you are developing with multiple Erlang releases, take a look at [erlenv][erlenv]. It is an erlang release management tool forked from [rbenv][rbenv] and can be used to easily manage multiple releases of Erlang/OTP.
 
 
 ## dependencies ##
@@ -39,7 +39,9 @@ If you are developing with multiple Erlang releases, take a look at [erlenv][erl
   - [`replace/2,3`](#replace23)
   - [`copy/2,3`](#copy23)
   - [`move/2,3`](#move23)
-  - [`test/1,2`](#test12)
+  - [`test/2,3`](#test23)
+  - [`apply/2,3`](#apply23)
+  - [`patch/2`](#patch2)
   - [`fold/2`](#fold2)
   - [`keys/2`](#keys2)
 * [callback exports](#callback-exports)
@@ -163,8 +165,18 @@ json:copy([list],[copiedlist],ExampleJSON).
   <<"newlibrary">> => <<"json">>}
 
 ```
+#### patch json using a list of ops ####
 
-
+```erlang
+1> ExJSON = json:from_binary(<<"{\"library\": \"json\", \"awesome\": false}">>).
+#{<<"awesome">> => false,<<"library">> => <<"json">>}
+2> PatchEx = #{<<"op">> => <<"add">>, <<"path">> => [patchtest], <<"value">> => true}.             
+#{<<"op">> => <<"add">>,<<"path">> => [patchtest],<<"value">> => true}
+(json_dev@fenrir)3> json:patch([PatchEx], ExJSON).
+#{<<"awesome">> => false,
+  <<"library">> => <<"json">>,
+  <<"patchtest">> => true}
+```
 
 #### fold function over json at supplied json path ####
 
@@ -193,14 +205,16 @@ json:copy([list],[copiedlist],ExampleJSON).
 
 A high level library for Erlang 17.0+. Leverages the new maps to support the [json][json] spec.
 
-More info to come.
 
 ## data types ##
 
 #### `path() type` ####
+```erlang
 path() :: binary() | [atom() | integer() | binary()]
+```
 
 #### `json() type` ####
+```erlang
 json() :: #{integer() | atom() | binary() => json()}
   | [json()]
   | integer()
@@ -209,81 +223,205 @@ json() :: #{integer() | atom() | binary() => json()}
   | true
   | false
   | null
+```
+
+#### `state() type` ####
+```erlang
+state() :: any()
+```
 
 ## exports ##
 
 ### from_binary/1 and to_binary/1 ###
+
 ```erlang
-from_binary/1
-to_binary/1
+from_binary(JSON) -> json()
+
+JSON = binary()
 ```
+Uses [jsx][jsx]'s [`decoder/3`][jsxencdeenc] to convert a `binary()` to `json()`.
+
+```erlang
+to_binary(JSON) -> binary()
+
+JSON = json()
+```
+Uses [jsx][jsx]'s [`encode`][jsxencdeenc] to convert `json()` to `binary()`.
+
+
 
 ### get/1,2 ###
 ```erlang
-get/2
-get/1
+get(Path, JSON) -> json()
+
+get(Path) -> fun((JSON) -> json())
+
+Path = path()
+JSON = json()
 ```
+
+Get `json()` at supplied *Path* in *JSON*, or return an anonymous function to be applied to a given *JSON*.
+
 
 ### add/2,3 ###
 ```erlang
-add/3
-add/2
+add(Path, Value, JSON) -> json()
+add(Path, Value) -> fun((JSON) -> json())
+
+Path = path()
+Value = json()
+JSON = json()
 ```
+Add *Value* at supplied *Path* in *JSON*, or return an anonymous function to do the same for a supplied *JSON*
 
 ### remove/1,2 ###
 ```erlang
-remove/2
-remove/1
+remove(Path, JSON) -> json()
+remove(Path) -> fun((JSON) -> json())
+
+Path = path()
+JSON = json()
 ```
+Remove json() at *Path* in *JSON*, or return an anonymous function to do the same for a supplied *JSON*
+
 
 ### replace/2,3 ###
 ```erlang
-replace/3
-replace/2
+replace(Path, Value, JSON) -> json()
+replace(Path, Value) -> fun((JSON) -> json())
+
+Path = path()
+Value = json()
+JSON = json()
 ```
+Replace *Path* in *JSON* with *Value*, or return an anonymous function to do the same for a supplied *JSON*.
+
 
 ### copy/2,3 ###
 ```erlang
-copy/3
-copy/2
+copy(From, To, JSON) -> json()
+copy(From, To) -> fun((JSON) -> json())
+
+From = path()
+To = path()
+JSON = json()
 ```
+Copy a json() term *From* a path *To* another path in *JSON*, or return an anonymous function to do the same for a supplied *JSON*.
+
 
 ### move/2,3 ###
 ```erlang
-move/3
-move/2
+move(From, To, JSON) -> json()
+move(From, To) -> fun((JSON) -> json())
+
+From = path()
+To = path()
+JSON = json()
+```
+Move a json() term *From* a path *To* another path in *JSON*, or return an anonymous function to do the same for a supplied *JSON*.
+
+### test/2,3 ###
+```erlang
+test(Path, Value, JSON) -> json()
+test(Path, Value) -> fun((JSON) -> json())
+
+Path = path()
+Value = json()
+JSON = json()
+```
+Test the existence of *Value* at a given *Path* in *JSON*, or return an anonymous function to do the same for a supplied *JSON*.
+
+### apply/2,3 ###
+```erlang
+apply(Path, Fun, JSON) -> json()
+apply(Path, Fun)  -> fun((JSON) -> json())
+```
+Apply function *Fun* at a given *Path* in *JSON*, or return an anonymous function to do the same for a supplied *JSON*.
+
+### patch/2 ###
+```erlang
+patch(Ops, JSON) -> json()
+
+Ops = [map()]
+JSON = json()
 ```
 
-### test/1,2 ###
+Patches *JSON* using the methods supplied by the maps in *Ops*.
+
+map format:
 ```erlang
-test/2
-test/1
+#{<<"ops">> => Op, <<"path">> => Path, <<Arg>> => Arg_val }
+
+Op = <<"add">>      % Arg = <<"value">>
+   | <<"remove">>   %     = none
+   | <<"replace">>  %     = <<"value">>
+   | <<"copy">>     %     = <<"from">>
+   | <<"move">>     %     = <<"from">>
+   | <<"test">>     %     = <<"value">>
+   
+Path = path()
+Arg = <<"value">> | <<"from">>
+
 ```
+
 
 ### fold/2 ###
 ```erlang
-fold/2
+fold(Funs, JSON) -> json().
+
+Funs = [function()]
+JSON = json()
+
 ```
+Fold a list of functions, *Funs*, over *JSON*.
 
 ### keys/2 ###
 ```erlang
-keys/2
+keys(Path, JSON) -> [binary()]
 ```
+Return a list of binary() keys at *Path* in *JSON*
+
 ## callback exports ##
 the following should be exported from a json callback module
 
 #### Module:init/1 ####
 
-init/1
+```erlang
+init([]) -> []
+
+```
+Used to initialize the starting internal state.
+
 
 #### Module:handle_event/2 ####
+```erlang
+handle_event(Event, State) -> state()
 
-handle_event/2
+Event = any()
+State = state()
+
+```
+used by the tokenizer to process json().
+
+internal state is a stack of in progress objects/arrays `[Current, Parent, Grandparent, ...OriginalAncestor]`.
+
+an object has the representation on the stack of `{object, #{NthKey => NthValue, NMinus1Key => NthMinus1Value, ...FirstKey => FirstValue}}` or if there's a key with a yet to be match value `{object, Key, #{NthKey => NthValue}, ...}
+
+an array looks like `{array, [NthValue, NthMinus1Value, ...FirstValue]}`
+
+Events:
+  - `end_json`
+  - `start_object`
+  - `end_object`
+  - `start_array`
+  - `end_array`
+  - `{key, Key}`
+  - `{_, Event}`
 
 
 
 ## acknowledgements ##
-tdeficit for originally doing all the hard work
+
 bobthenameless for helping with documentation
 
 
@@ -296,3 +434,4 @@ bobthenameless for helping with documentation
 [rfc6901]: http://tools.ietf.org/html/rfc6901
 [MIT]: http://www.opensource.org/licenses/mit-license.html
 [json]: http://json.org
+[jsxencdeenc]: https://github.com/talentdeficit/jsx#encoder3-decoder3--parser3
