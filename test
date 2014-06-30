@@ -1,0 +1,40 @@
+#!/usr/bin/env escript
+%% -*- erlang -*-
+%%! -smp enable -pa deps/jsx/ebin -pa deps/jsonpointer/ebin -pa ebin
+
+-mode(compile).
+-include_lib("eunit/include/eunit.hrl").
+
+% tests from https://github.com/json-patch/json-patch-tests
+
+main(Args) ->
+  {ok, TestsBin} = file:read_file("./deps/json_patch_tests/tests.json"),
+  {ok, SpecTestsBin} = file:read_file("./deps/json_patch_tests/spec_tests.json"),
+  Tests = json:from_binary(TestsBin) ++ json:from_binary(SpecTestsBin),
+  eunit:test(lists:map(
+    fun(Test) -> do(Test) end,
+    % drop disabled tests
+    lists:dropwhile(fun(Map) ->
+      case maps:find(<<"disabled">>, Map) of
+        {ok, true} -> true;
+        error -> false
+      end
+    end, Tests)
+  ), case Args of ["-v"] -> [verbose]; _ -> [] end).
+
+do(Test) ->
+  try maps:get(<<"error">>, Test), ?_assertError(badarg, patch(Test))
+  catch error:bad_key -> ?_assertEqual(expected(Test), patch(Test))
+  end.
+
+patch(Test) ->
+  Patch = maps:get(<<"patch">>, Test),
+  Doc = maps:get(<<"doc">>, Test),
+  json:patch(Patch, Doc).
+
+% if there's no `expected` key in the test object i guess we are
+%  meant to check that the doc is unmodified?
+expected(Test) ->
+  try maps:get(<<"expected">>, Test)
+  catch error:bad_key -> maps:get(<<"doc">>, Test)
+  end.

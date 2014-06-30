@@ -1,5 +1,5 @@
 language: erlang
-script: rebar compile && rebar skip_deps=true eunit
+script: rebar compile && rebar skip_deps=true eunit && ./test
 otp_release:
   - 17.0
 

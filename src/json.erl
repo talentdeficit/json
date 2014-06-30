@@ -21,12 +21,12 @@
 %% THE SOFTWARE.
 
 -module(json).
--compile({no_auto_import,[get/1]}).
+-compile({no_auto_import,[get/1, apply/3]}).
 
 -export([from_binary/1, to_binary/1]).
--export([get/2, add/3, remove/2, replace/3, copy/3, move/3, test/2]).
--export([get/1, add/2, remove/1, replace/2, copy/2, move/2, test/1]).
--export([fold/2, keys/2]).
+-export([get/2, add/3, remove/2, replace/3, copy/3, move/3, test/3, apply/3]).
+-export([get/1, add/2, remove/1, replace/2, copy/2, move/2, test/2, apply/2]).
+-export([patch/2, fold/2, keys/2]).
 -export([init/1, handle_event/2]).
 
 
@@ -48,12 +48,14 @@ from_binary(JSON) ->
   catch error:_ -> erlang:error(badarg)
   end.
 
+
 -spec to_binary(JSON::json()) -> binary().
 
 to_binary(JSON) ->
   try jsx:encode(JSON)
   catch error:_ -> erlang:error(badarg)
   end.
+
 
 -spec get(Path::path(), JSON::json()) -> json().
 -spec get(Path::path()) -> fun((JSON::json()) -> json()).
@@ -92,7 +94,7 @@ remove(Path) -> fun(JSON) -> remove(Path, JSON) end.
 -spec replace(Path::path(), Value::json()) -> fun((JSON::json()) -> json()).
 
 replace(Path, Value, JSON) ->
-  try add(Path, Value, remove(Path, JSON))
+  try replace0(maybe_decode(Path), Value, JSON)
   catch error:_ -> erlang:error(badarg)
   end.
 
@@ -114,22 +116,38 @@ copy(From, To) -> fun(JSON) -> copy(From, To, JSON) end.
 -spec move(From::path(), To::path()) -> fun((JSON::json()) -> json()).
 
 move(From, To, JSON) ->
-  try remove(From, copy(From, To, JSON))
+  try move0(maybe_decode(From), maybe_decode(To), JSON)
   catch error:_ -> erlang:error(badarg)
   end.
 
 move(From, To) -> fun(JSON) -> move(From, To, JSON) end.
 
 
--spec test(Path::path(), JSON::json()) -> json().
--spec test(Path::path()) -> fun((JSON::json()) -> json()).
+-spec test(Path::path(), Value::json(), JSON::json()) -> json().
+-spec test(Path::path(), Value::json()) -> fun((JSON::json()) -> json()).
 
-test(Path, JSON) ->
-  try get(Path, JSON), JSON
+test(Path, Value, JSON) ->
+  try Get = get(Path, JSON), Get = Value, JSON
   catch error:_ -> erlang:error(badarg)
   end.
 
-test(Path) -> fun(JSON) -> test(Path, JSON) end.
+test(Path, Value) -> fun(JSON) -> test(Path, Value, JSON) end.
+
+
+-spec apply(Path::path(), Fun::function(), JSON::json()) -> json().
+-spec apply(Path::path(), Fun::function()) -> fun((JSON::json()) -> json()).
+
+apply(Path, Fun, JSON) ->
+  try replace(Path, Fun(get(Path, JSON)), JSON)
+  catch error:_ -> erlang:error(badarg)
+  end.
+
+apply(Path, Fun) -> fun(JSON) -> apply(Path, Fun, JSON) end.
+
+
+-spec patch(Ops::[map()], JSON::json()) -> json().
+
+patch(Ops, JSON) -> patch0(Ops, JSON).
 
 
 -spec fold([function()], JSON::json()) -> json().
@@ -144,10 +162,12 @@ keys(Path, JSON) ->
   catch error:_ -> erlang:error(badarg)
   end.
 
+
 % internal functions
 
 maybe_decode(Path) when is_list(Path) -> Path;
 maybe_decode(Path) when is_binary(Path) -> jsonpointer:decode(Path).
+
 
 get0([], JSON) -> JSON;
 get0([Ref|Rest], JSON)
@@ -163,6 +183,7 @@ when is_integer(Ref), is_list(JSON) ->
 get0([Ref|Rest], JSON)
 when is_binary(Ref), is_list(JSON) ->
   get0([jsonpointer:ref_to_int(Ref)] ++ Rest, JSON).
+
 
 add0([], Value, _JSON) -> Value;
 add0([Ref], Value, JSON)
@@ -189,6 +210,7 @@ add0([Ref|Rest], Value, JSON)
 when is_binary(Ref), is_list(JSON) ->
   add0([jsonpointer:ref_to_int(Ref)] ++ Rest, Value, JSON).
 
+
 remove0([], _JSON) -> erlang:error(badarg);
 remove0([Ref], JSON)
 when is_binary(Ref), is_map(JSON) ->
@@ -214,12 +236,53 @@ remove0([Ref|Rest], JSON)
 when is_binary(Ref), is_list(JSON) ->
   remove0([jsonpointer:ref_to_int(Ref)] ++ Rest, JSON).
 
+
+replace0([], Value, _JSON) -> Value;
+replace0(Path, Value, JSON) -> add(Path, Value, remove(Path, JSON)).
+
+
+move0([], To, JSON) when is_map(JSON) -> add(To, JSON, #{});
+move0([], To, JSON) when is_list(JSON) -> add(To, JSON, []);
+move0(From, To, JSON) ->
+  Value = get(From, JSON),
+  add(To, Value, remove(From, JSON)).
+
+
+patch0(Ops, JSON) ->
+  fold([ case maps:get(<<"op">>, Op) of
+    <<"add">> ->
+      Path = maps:get(<<"path">>, Op),
+      Value = maps:get(<<"value">>, Op),
+      json:add(Path, Value);
+    <<"remove">> ->
+      Path = maps:get(<<"path">>, Op),
+      json:remove(Path);
+    <<"replace">> ->
+      Path = maps:get(<<"path">>, Op),
+      Value = maps:get(<<"value">>, Op),
+      json:replace(Path, Value);
+    <<"copy">> ->
+      Path = maps:get(<<"path">>, Op),
+      From = maps:get(<<"from">>, Op),
+      json:copy(From, Path);
+    <<"move">> ->
+      Path = maps:get(<<"path">>, Op),
+      From = maps:get(<<"from">>, Op),
+      json:move(From, Path);
+    <<"test">> ->
+      Path = maps:get(<<"path">>, Op),
+      Value = maps:get(<<"value">>, Op),
+      json:test(Path, Value)
+  end || Op <- Ops ], JSON).
+
+
 % replace the decode backend of jsx with one that produces maps
 
 -type state() :: [any()].
 -spec init([]) -> state().
 
 init([]) -> [].
+
 
 -spec handle_event(Event::any(), State::state()) -> state().
 
@@ -272,6 +335,8 @@ insert(_, _) -> erlang:error(badarg).
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
 
+
+encode_test_() -> [{"empty object", ?_assertEqual(<<"{}">>, to_binary(#{}))}].
 
 decode_test_() ->
   [
@@ -545,8 +610,8 @@ replace_test_() ->
     }
   },
   [
-    ?_assertError(badarg, replace(<<>>, #{}, JSON)),
-    ?_assertError(badarg, replace([], #{}, JSON)),
+    ?_assertEqual(#{}, replace(<<>>, #{}, JSON)),
+    ?_assertEqual(#{}, replace([], #{}, JSON)),
     ?_assertEqual(
       #{
         <<"a">> => 2,
@@ -595,20 +660,69 @@ replace_test_() ->
   ].
 
 
+copy_test_() ->
+  JSON = #{<<"foo">> => <<"bar">>},
+  [
+    ?_assertEqual(JSON, copy([foo], [foo], JSON)),
+    ?_assertEqual(#{<<"foo">> => JSON}, copy([], [foo], JSON)),
+    ?_assertEqual([[1], 1], copy([], [0], [1])),
+    ?_assertEqual(#{<<"foo">> => <<"bar">>, <<"qux">> => <<"bar">>}, copy([foo], [qux], JSON)),
+    ?_assertError(badarg, copy([qux], [foo], JSON))
+  ].
+
+
+move_test_() ->
+  JSON = #{<<"foo">> => <<"bar">>},
+  [
+    ?_assertEqual(JSON, move([foo], [foo], JSON)),
+    ?_assertEqual(#{<<"foo">> => JSON}, move([], [foo], JSON)),
+    ?_assertEqual([[1]], move([], [0], [1])),
+    ?_assertEqual(#{<<"qux">> => <<"bar">>}, move([foo], [qux], JSON)),
+    ?_assertError(badarg, move([qux], [foo], JSON))
+  ].
+
+
 test_test_() ->
   JSON = #{
     <<"a">> => 1,
     <<"b">> => #{<<"c">> => 2},
     <<"d">> => #{
-      <<"e">> => [#{<<"a">> => 3}, #{<<"b">> => 4}, #{<<"c">> => 5}]
+      <<"e">> => [#{<<"a">> => 3}, #{<<"b">> => 4}]
     }
   },
   [
-    ?_assertEqual(JSON, test(<<"/a">>, JSON)),
-    ?_assertEqual(JSON, test(<<"/b/c">>, JSON)),
-    ?_assertEqual(JSON, test(<<"/d/e/0/a">>, JSON)),
-    ?_assertEqual(JSON, test(<<"/d/e/1/b">>, JSON)),
-    ?_assertError(badarg, test(<<"/e">>, JSON))
+    ?_assertEqual(JSON, test(<<"/a">>, 1, JSON)),
+    ?_assertEqual(JSON, test(<<"/b/c">>, 2, JSON)),
+    ?_assertEqual(JSON, test(<<"/d/e/0/a">>, 3, JSON)),
+    ?_assertEqual(JSON, test(<<"/d/e/1/b">>, 4, JSON)),
+    ?_assertError(badarg, test(<<"/e">>, false, JSON))
+  ].
+
+
+apply_test_() ->
+  [
+    ?_assertEqual(#{<<"key">> => false}, apply(<<"/key">>, fun(true) -> false end, #{<<"key">> => true})),
+    ?_assertError(badarg, apply(<<"/nokey">>, fun(_) -> ok end, #{})),
+    ?_assertError(badarg, apply(<<"/key">>, fun(_) -> erlang:error(noerror) end, #{<<"key">> => true}))
+  ].
+
+
+patch_test_() ->
+  JSON = #{<<"foo">> => <<"bar">>},
+  [
+    ?_assertEqual(
+      #{<<"foo">> => <<"baz">>},
+      patch([
+          #{<<"op">> => <<"test">>, <<"path">> => <<"/foo">>, <<"value">> => <<"bar">>},
+          #{<<"op">> => <<"copy">>, <<"from">> => <<"/foo">>, <<"path">> => <<"/qux">>},          
+          #{<<"op">> => <<"test">>, <<"path">> => <<"/qux">>, <<"value">> => <<"bar">>},
+          #{<<"op">> => <<"replace">>, <<"path">> => <<"/qux">>, <<"value">> => <<"baz">>},
+          #{<<"op">> => <<"remove">>, <<"path">> => <<"/foo">>},
+          #{<<"op">> => <<"move">>, <<"from">> => <<"/qux">>, <<"path">> => <<"/foo">>},
+          #{<<"op">> => <<"test">>, <<"path">> => <<"/foo">>, <<"value">> => <<"baz">>}
+        ], JSON
+      )
+    )
   ].
 
 
@@ -616,17 +730,17 @@ fold_test_() ->
   JSON = #{<<"foo">> => <<"bar">>},
   [
     ?_assertEqual(
-      JSON,
+      #{<<"foo">> => <<"baz">>},
       fold([
-        test(<<"/foo">>),
-        copy(<<"/foo">>, <<"/qux">>),
-        test(<<"/qux">>),
-        replace(<<"/qux">>, <<"baz">>),
-        remove(<<"/foo">>),
-        move(<<"/qux">>, <<"/foo">>),
-        replace(<<"/foo">>, JSON),
-        get(<<"/foo">>)
-      ], JSON)
+          test(<<"/foo">>, <<"bar">>),
+          copy(<<"/foo">>, <<"/qux">>),
+          test(<<"/qux">>, <<"bar">>),
+          replace(<<"/qux">>, <<"baz">>),
+          remove(<<"/foo">>),
+          move(<<"/qux">>, <<"/foo">>),
+          test(<<"/foo">>, <<"baz">>)
+        ], JSON
+      )
     )
   ].
 
