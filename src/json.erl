@@ -755,5 +755,123 @@ keys_test_() ->
     ?_assertError(badarg, keys(<<>>, [1,2,3]))
   ].
 
+readme_test_() ->
+  ExampleJSON = json:from_binary(<<"{\"library\": \"json\", \"awesome\": true, \"list\": [{\"a\": 1}, {\"b\": 2}, {\"c\": 3} ]}">>),
+  PatchEx = #{<<"op">> => <<"add">>, <<"path">> => [patchtest], <<"value">> => true},
+  [
+    %% from_binary example
+    ?_assertEqual(#{
+      <<"awesome">> => true,
+      <<"library">> => <<"json">>,
+      <<"list">> => [#{<<"a">> => 1},#{<<"b">> => 2},#{<<"c">> => 3}]
+      },
+      from_binary(<<"{\"library\": \"json\", \"awesome\": true, \"list\": [{\"a\": 1}, {\"b\": 2}, {\"c\": 3} ]}">>)
+    ),
+    %% to_binary example
+    ?_assertEqual(<<"{\"awesome\":true,\"library\":\"json\",\"list\":[{\"a\":1},{\"b\":2},{\"c\":3}]}">>,
+      to_binary(ExampleJSON)
+    ),
+    %% get example
+    ?_assertEqual(1, get(<<"/list/0/a">>, ExampleJSON)),
+    ?_assertEqual(1, get([list, 0, a], ExampleJSON)),
+    
+    %% add 1>
+    ?_assertEqual(#{
+      <<"addition">> => <<"1+1">>,
+      <<"awesome">> => true,
+      <<"library">> => <<"json">>,
+      <<"list">> => [#{<<"a">> => 1},#{<<"b">> => 2},#{<<"c">> => 3}]
+    },
+    add([addition], <<"1+1">>, ExampleJSON)
+    ),    
+    %% add 2>
+    ?_assertEqual(#{
+      <<"awesome">> => true,
+      <<"library">> => <<"json">>,
+      <<"list">> => [#{<<"a">> => 1},#{<<"b">> => 2},#{<<"c">> => 3}],
+      <<"recursion">> => #{
+        <<"awesome">> => true,
+        <<"library">> => <<"json">>,
+        <<"list">> => [#{<<"a">> => 1},#{<<"b">> => 2},#{<<"c">> => 3}]}
+      },
+      add([recursion], ExampleJSON, ExampleJSON)
+    ),    
+    %% add 3
+    ?_assertEqual(#{
+      <<"awesome">> => true,
+      <<"library">> => <<"json">>,
+      <<"list">> => [#{<<"a">> => 1},#{<<"b">> => 2},#{<<"c">> => 3}],
+      <<"map">> => #{<<"test2">> => 50}
+      },
+      add([map], #{<<"test2">> => 50}, ExampleJSON)
+    ),    
+    %% add 4
+    ?_assertEqual(#{
+      <<"awesome">> => true,
+      <<"library">> => <<"json">>,
+      <<"list">> => [#{<<"a">> => 1},#{<<"b">> => 2},#{<<"c">> => 3}],
+      <<"listtest">> => [50,<<"listadd">>,testatom]
+      },
+      add(<<"/listtest">>, [50, <<"listadd">>, testatom], ExampleJSON)
+    ),    
+    %% remove 1
+    ?_assertEqual(#{
+      <<"awesome">> => true,
+      <<"library">> => <<"json">>,
+      <<"list">> => [#{<<"a">> => 1},#{<<"b">> => 2}]
+      },
+      remove([list, 2],  ExampleJSON)
+    ),    
+    %% replace 1
+    ?_assertEqual(#{
+      <<"awesome">> => <<"json in erlang!">>,
+      <<"library">> => <<"json">>,
+      <<"list">> => [#{<<"a">> => 1},#{<<"b">> => 2},#{<<"c">> => 3}]
+      },
+      replace([awesome], <<"json in erlang!">> ,ExampleJSON)
+    ),    
+    %% copy 1
+    ?_assertEqual(#{
+      <<"awesome">> => true,
+      <<"library">> => <<"json">>,
+      <<"list">> => [#{<<"a">> => 1},#{<<"b">> => 2},#{<<"c">> => 3}],
+      <<"copiedlist">> => [#{<<"a">> => 1},#{<<"b">> => 2},#{<<"c">> => 3}] 
+      },
+      copy([list],[copiedlist],ExampleJSON)
+    ),    
+    %% move 1
+    ?_assertEqual(#{
+      <<"awesome">> => true,
+      <<"newlibrary">> => <<"json">>,
+      <<"list">> => [#{<<"a">> => 1},#{<<"b">> => 2},#{<<"c">> => 3}]
+      },
+      move([library], [newlibrary], ExampleJSON)
+    ),    
+    %% patch 1
+    ?_assertEqual(#{
+      <<"awesome">> => true,
+      <<"library">> => <<"json">>,
+      <<"list">> => [#{<<"a">> => 1},#{<<"b">> => 2},#{<<"c">> => 3}],
+      <<"patchtest">> => true
+      },
+      patch([PatchEx], ExampleJSON)
+    ),    
+    %% fold 1>
+    ?_assertEqual([
+      #{<<"b">> => 2},#{<<"c">> => <<"end of fold">>}
+      ],
+      fold([json:get([]), json:get([list]), json:remove([0]), json:replace([1, c], <<"end of fold">> )], ExampleJSON)
+    ),
+    %% fold 2>
+    ?_assertEqual(9,
+      fold([json:get([]), json:get([list]), json:remove([0]), json:replace([1, c], <<"123456789">> ),
+            json:get([1, c]), fun binary:bin_to_list/1, fun string:len/1], ExampleJSON)
+    ),    
+    %% keys
+    ?_assertEqual([<<"awesome">>,<<"library">>, <<"list">>],
+      keys([], ExampleJSON)
+    )
+  ].
+
 
 -endif.
