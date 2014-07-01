@@ -152,13 +152,16 @@ convert between json() and binary() erlang types.
 #### patch json using a list of ops ####
 
 ```erlang
-1> ExJSON = json:from_binary(<<"{\"library\": \"json\", \"awesome\": false}">>).
-#{<<"awesome">> => false,<<"library">> => <<"json">>}
-2> PatchEx = #{<<"op">> => <<"add">>, <<"path">> => [patchtest], <<"value">> => true}.             
-#{<<"op">> => <<"add">>,<<"path">> => [patchtest],<<"value">> => true}
-3> json:patch([PatchEx], ExJSON).
-#{<<"awesome">> => false,
+ExampleJSON = json:from_binary(<<"{\"library\": \"json\", \"awesome\": true, \"list\": [{\"a\": 1}, {\"b\": 2}, {\"c\": 3} ]}">>).
+#{<<"awesome">> => true,
   <<"library">> => <<"json">>,
+  <<"list">> => [#{<<"a">> => 1},#{<<"b">> => 2},#{<<"c">> => 3}]}
+2> PatchEx = #{<<"op">> => <<"add">>, <<"path">> => [patchtest], <<"value">> => true}.
+#{<<"op">> => <<"add">>,<<"path">> => [patchtest],<<"value">> => true}
+3> json:patch([PatchEx], ExampleJSON).
+#{<<"awesome">> => true,
+  <<"library">> => <<"json">>,
+  <<"list">> => [#{<<"a">> => 1},#{<<"b">> => 2},#{<<"c">> => 3}],
   <<"patchtest">> => true}
 ```
 
