@@ -31,7 +31,7 @@
 
 
 -type path() :: binary() | [atom() | integer() | binary()].
--type json() :: #{integer() | atom() | binary() => json()}
+-type json() :: #{binary() => json()}
   | [json()]
   | integer()
   | float()
