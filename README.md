@@ -168,14 +168,17 @@ ExampleJSON = json:from_binary(<<"{\"library\": \"json\", \"awesome\": true, \"l
 #### fold function over json at supplied json path ####
 
 ```erlang
-1> json:fold([json:get([]), json:get([list]),
-1> json:remove([0]), json:replace([1, c],
-1> <<"end of fold">> )], ExampleJSON).
-[#{<<"b">> => 2},#{<<"c">> => <<"end of fold">>}]
-2> json:fold([json:get([]), json:get([list]),
-2> json:remove([0]), json:replace([1, c], <<"123456789">> ),
-2> json:get([1, c]), fun binary:bin_to_list/1, fun string:len/1], ExampleJSON).
-9
+1> JSON = #{<<"foo">> => <<"bar">>}.
+#{<<"foo">> => <<"bar">>}
+2> json:fold([json:test(<<"/foo">>, <<"bar">>),
+2>   json:copy(<<"/foo">>, <<"/qux">>),
+2>   json:test(<<"/qux">>, <<"bar">>),
+2>   json:replace(<<"/qux">>, <<"baz">>),
+2>   json:remove(<<"/foo">>),
+2>   json:move(<<"/qux">>, <<"/foo">>),
+2>   json:test(<<"/foo">>, <<"baz">>)
+2> ], JSON).
+#{<<"foo">> => <<"baz">>}
 ```
 
 #### return json keys at supplied json path ####
@@ -374,5 +377,4 @@ return a list of binary() keys at *Path* in *JSON*
 [MIT]: http://www.opensource.org/licenses/mit-license.html
 [json]: http://json.org
 [jsxencdeenc]: https://github.com/talentdeficit/jsx#encoder3-decoder3--parser3
-
 [bobthenameless]: https://github.com/bobthenameless

@@ -774,8 +774,7 @@ readme_test_() ->
     %% get example
     ?_assertEqual(1, get(<<"/list/0/a">>, ExampleJSON)),
     ?_assertEqual(1, get([list, 0, a], ExampleJSON)),
-    
-    %% add 1>
+    %% add 1
     ?_assertEqual(#{
       <<"addition">> => <<"1+1">>,
       <<"awesome">> => true,
@@ -783,8 +782,8 @@ readme_test_() ->
       <<"list">> => [#{<<"a">> => 1},#{<<"b">> => 2},#{<<"c">> => 3}]
     },
     add([addition], <<"1+1">>, ExampleJSON)
-    ),    
-    %% add 2>
+    ),
+    %% add 2
     ?_assertEqual(#{
       <<"awesome">> => true,
       <<"library">> => <<"json">>,
@@ -795,7 +794,7 @@ readme_test_() ->
         <<"list">> => [#{<<"a">> => 1},#{<<"b">> => 2},#{<<"c">> => 3}]}
       },
       add([recursion], ExampleJSON, ExampleJSON)
-    ),    
+    ),
     %% add 3
     ?_assertEqual(#{
       <<"awesome">> => true,
@@ -804,7 +803,7 @@ readme_test_() ->
       <<"map">> => #{<<"test2">> => 50}
       },
       add([map], #{<<"test2">> => 50}, ExampleJSON)
-    ),    
+    ),
     %% add 4
     ?_assertEqual(#{
       <<"awesome">> => true,
@@ -813,24 +812,24 @@ readme_test_() ->
       <<"listtest">> => [50,<<"listadd">>,testatom]
       },
       add(<<"/listtest">>, [50, <<"listadd">>, testatom], ExampleJSON)
-    ),    
-    %% remove 1
+    ),
+    %% remove
     ?_assertEqual(#{
       <<"awesome">> => true,
       <<"library">> => <<"json">>,
       <<"list">> => [#{<<"a">> => 1},#{<<"b">> => 2}]
       },
       remove([list, 2],  ExampleJSON)
-    ),    
-    %% replace 1
+    ),
+    %% replace
     ?_assertEqual(#{
       <<"awesome">> => <<"json in erlang!">>,
       <<"library">> => <<"json">>,
       <<"list">> => [#{<<"a">> => 1},#{<<"b">> => 2},#{<<"c">> => 3}]
       },
       replace([awesome], <<"json in erlang!">> ,ExampleJSON)
-    ),    
-    %% copy 1
+    ),
+    %% copy
     ?_assertEqual(#{
       <<"awesome">> => true,
       <<"library">> => <<"json">>,
@@ -838,16 +837,16 @@ readme_test_() ->
       <<"copiedlist">> => [#{<<"a">> => 1},#{<<"b">> => 2},#{<<"c">> => 3}] 
       },
       copy([list],[copiedlist],ExampleJSON)
-    ),    
-    %% move 1
+    ),
+    %% move
     ?_assertEqual(#{
       <<"awesome">> => true,
       <<"newlibrary">> => <<"json">>,
       <<"list">> => [#{<<"a">> => 1},#{<<"b">> => 2},#{<<"c">> => 3}]
       },
       move([library], [newlibrary], ExampleJSON)
-    ),    
-    %% patch 1
+    ),
+    %% patch
     ?_assertEqual(#{
       <<"awesome">> => true,
       <<"library">> => <<"json">>,
@@ -855,18 +854,21 @@ readme_test_() ->
       <<"patchtest">> => true
       },
       patch([PatchEx], ExampleJSON)
-    ),    
-    %% fold 1>
-    ?_assertEqual([
-      #{<<"b">> => 2},#{<<"c">> => <<"end of fold">>}
-      ],
-      fold([json:get([]), json:get([list]), json:remove([0]), json:replace([1, c], <<"end of fold">> )], ExampleJSON)
     ),
-    %% fold 2>
-    ?_assertEqual(9,
-      fold([json:get([]), json:get([list]), json:remove([0]), json:replace([1, c], <<"123456789">> ),
-            json:get([1, c]), fun binary:bin_to_list/1, fun string:len/1], ExampleJSON)
-    ),    
+    %% fold
+    ?_assertEqual(
+      #{<<"foo">> => <<"baz">>},
+      fold([
+          test(<<"/foo">>, <<"bar">>),
+          copy(<<"/foo">>, <<"/qux">>),
+          test(<<"/qux">>, <<"bar">>),
+          replace(<<"/qux">>, <<"baz">>),
+          remove(<<"/foo">>),
+          move(<<"/qux">>, <<"/foo">>),
+          test(<<"/foo">>, <<"baz">>)
+        ], #{<<"foo">> => <<"bar">>}
+      )
+    ),
     %% keys
     ?_assertEqual([<<"awesome">>,<<"library">>, <<"list">>],
       keys([], ExampleJSON)
