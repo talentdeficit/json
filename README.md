@@ -353,16 +353,16 @@ apply function *Fun* at a given *Path* in *JSON*, or return an anonymous functio
 ```erlang
 patch(Ops, JSON) -> json()
 
-Ops = [#{<<"op">> => Op, <<"path">> => Path, <<"arg">> => Arg}]
+Ops = [#{<<"op">> => Op, <<"path">> => Path, Arg => Value}]
 JSON = json()
-Op = <<"add">>      % Arg = <<"value">>
-   | <<"remove">>   %     = none
-   | <<"replace">>  %     = <<"value">>
-   | <<"copy">>     %     = <<"from">>
-   | <<"move">>     %     = <<"from">>
-   | <<"test">>     %     = <<"value">>
+Op = #{<<"op">> => <<"add">>, <<"path">> => Path, <<"value">> => Value}
+   | #{<<"op">> => <<"remove">>, <<"path">> => Path}
+   | #{<<"op">> => <<"replace">>, <<"path">> => Path, <<"value">> => Value}
+   | #{<<"op">> => <<"copy">>, <<"path">> => Path, <<"from">> => Path}
+   | #{<<"op">> => <<"move">>, <<"path">> => Path, <<"from">> => Path}
+   | #{<<"op">> => <<"test">>, <<"path">> => Path, <<"value">> => Value}
 Path = path()
-Arg = <<"value">> | <<"from">>
+Value = json()
 ```
 
 patches *JSON* using the methods supplied by the maps in *Ops*.
