@@ -28,7 +28,10 @@ erlang 17.0+ is required to use this library due to it's reliance on the new map
   - [`path()`](#path-type)
   - [`json()`](#json-type)
 * [exports](#exports)
-  - [`from_binary/1 and to_binary/1`](#from_binary1-and-to_binary1)
+  - [`from_binary/1`](#from_binary1)
+  - [`to_binary/1`](#to_binary1)
+  - [`minify/1`](#minify1)
+  - [`prettify/1`](#prettify1)
   - [`get/1,2`](#get12)
   - [`add/2,3`](#add23)
   - [`remove/1,2`](#remove12)
@@ -165,7 +168,7 @@ ExampleJSON = json:from_binary(<<"{\"library\": \"json\", \"awesome\": true, \"l
   <<"patchtest">> => true}
 ```
 
-#### fold function over json at supplied json path ####
+#### fold functions over json at supplied json path ####
 
 ```erlang
 1> JSON = #{<<"foo">> => <<"bar">>}.
@@ -215,7 +218,7 @@ json() :: #{binary() => json()}
 
 ## exports ##
 
-### from_binary/1 and to_binary/1 ###
+### from_binary/1 ###
 
 ```erlang
 from_binary(JSON) -> json()
@@ -224,12 +227,34 @@ JSON = binary()
 ```
 uses [jsx][jsx]'s [`decoder/3`][jsxencdeenc] to convert a `binary()` to `json()`
 
+### to_binary/1 ###
+
 ```erlang
 to_binary(JSON) -> binary()
 
 JSON = json()
 ```
 uses [jsx][jsx]'s [`encode`][jsxencdeenc] to convert `json()` to `binary()`
+
+### minify/1 ###
+
+```erlang
+minify(JSON) -> binary()
+
+JSON = json()
+```
+
+removes all non-semantic whitespace from a json binary
+
+### prettify/1 ###
+
+```erlang
+prettify(JSON) -> binary()
+
+JSON = json()
+```
+
+formats a json binary for output with spaces and newlines
 
 ### get/1,2 ###
 
