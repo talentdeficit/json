@@ -88,10 +88,14 @@ get(Path) -> fun(JSON) -> get(Path, JSON) end.
 -spec add(Path::path(), Value::json(), JSON::json()) -> json().
 -spec add(Path::path(), Value::json()) -> fun((JSON::json()) -> json()).
 
-add(Path, Value, JSON) ->
+add(Path, Value, JSON)
+when is_integer(Value); is_float(Value); is_binary(Value);
+    is_map(Value); is_list(Value);
+    Value == true; Value == false; Value == null ->
   try add0(maybe_decode(Path), Value, JSON)
   catch error:_ -> erlang:error(badarg)
-  end.
+  end;
+add(_, _, _) -> erlang:error(badarg).
 
 add(Path, Value) -> fun(JSON) -> add(Path, Value, JSON) end.
 
