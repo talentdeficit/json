@@ -24,6 +24,7 @@
 -compile({no_auto_import,[get/1, apply/3]}).
 
 -export([from_binary/1, to_binary/1]).
+-export([from_list/1]).
 -export([minify/1, prettify/1]).
 -export([get/2, add/3, remove/2, replace/3, copy/3, move/3, test/3, apply/3]).
 -export([get/1, add/2, remove/1, replace/2, copy/2, move/2, test/2, apply/2]).
@@ -56,6 +57,15 @@ to_binary(JSON) ->
   try jsx:encode(JSON)
   catch error:_ -> erlang:error(badarg)
   end.
+
+
+-spec from_list(List::list()) -> json().
+
+from_list(List) ->
+list_to_json(List).
+%  try list_to_json(List)
+%  catch error:_ -> erlang:error(badarg)
+%  end.
 
 
 -spec minify(JSON::binary()) -> binary().
@@ -188,6 +198,22 @@ keys(Path, JSON) ->
 
 maybe_decode(Path) when is_list(Path) -> Path;
 maybe_decode(Path) when is_binary(Path) -> jsonpointer:decode(Path).
+
+
+list_to_json([{_, _}|_] = List) -> list_to_json(List, #{});
+list_to_json(List) -> list_to_json(List, []).
+
+list_to_json([], JSON) -> JSON;
+list_to_json([{Key, Val}|Rest], JSON) when is_list(Val) ->
+  NewJSON = add([Key], list_to_json(Val), JSON),
+  list_to_json(Rest, NewJSON);
+list_to_json([Val|Rest], JSON) when is_list(Val) ->
+  NewJSON = add([<<"-">>], list_to_json(Val), JSON),
+  list_to_json(Rest, NewJSON);
+list_to_json([{Key, Val}|Rest], JSON) ->
+  list_to_json(Rest, add([Key], Val, JSON));
+list_to_json([Val|Rest], JSON) ->
+  list_to_json(Rest, add([<<"-">>], Val, JSON)).
 
 
 get0([], JSON) -> JSON;
@@ -395,6 +421,44 @@ decode_test_() ->
     {"raw value", ?_assertEqual(1.0, from_binary(<<"1.0">>))}
   ].
 
+from_list_test_() ->
+  [
+    {"simple object", ?_assertEqual(
+      #{<<"key">> => <<"value">>},
+      from_list([{key, <<"value">>}])
+    )},
+    {"simple array", ?_assertEqual(
+      [true, false, null],
+      from_list([true, false, null])
+    )},
+    {"nested object", ?_assertEqual(
+      #{<<"key">> => #{<<"key">> => <<"value">>}},
+      from_list([{<<"key">>, [{<<"key">>, <<"value">>}]}])
+    )},
+    {"complex object", ?_assertEqual(
+      #{<<"key">> => [
+          #{<<"key">> => <<"value">>},
+          #{<<"key">> => []},
+          #{<<"key">> => 1.0},
+          true,
+          false,
+          null
+        ],
+        <<"another key">> => []
+      },
+      from_list([{key, [
+            [{key, <<"value">>}],
+            [{key, []}],
+            [{key, 1.0}],
+            true,
+            false,
+            null
+        ]},
+        {'another key', []}
+      ])
+    )},
+    {"empty list", ?_assertEqual([], from_list([]))}
+  ].
 
 get_test_() ->
   JSON = #{
