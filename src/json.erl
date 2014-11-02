@@ -423,6 +423,7 @@ decode_test_() ->
 
 from_list_test_() ->
   [
+    {"empty list", ?_assertEqual([], from_list([]))},
     {"simple object", ?_assertEqual(
       #{<<"key">> => <<"value">>},
       from_list([{key, <<"value">>}])
@@ -459,6 +460,12 @@ from_list_test_() ->
     )},
     {"empty list", ?_assertEqual([], from_list([]))}
   ].
+
+to_list_test() ->
+  [
+    {"empty map", ?_assertEqual([], to_list(#{}))},
+    {"empty list", ?_assertEqual([], to_list([]))}
+  ]
 
 get_test_() ->
   JSON = #{
