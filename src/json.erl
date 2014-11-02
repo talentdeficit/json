@@ -517,7 +517,15 @@ to_list_test_() ->
           ],
           'another key' => []
         }
-    ))}
+    ))},
+    {"array in object", ?_assertEqual(
+      [{key, [true, false, null]}],
+      to_list(#{key => [true, false, null]})
+    )},
+    {"object in array", ?_assertEqual(
+      [true, false, null, [{key, <<"value">>}]],
+      to_list([true, false, null, #{key => <<"value">>}])
+    )}
   ].
 
 get_test_() ->
