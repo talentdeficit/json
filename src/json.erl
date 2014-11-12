@@ -26,6 +26,7 @@
 -export([from_binary/1, to_binary/1]).
 -export([from_list/1, to_list/1]).
 -export([minify/1, prettify/1]).
+-export([filter/3]).
 -export([get/2, add/3, remove/2, replace/3, copy/3, move/3, test/3, apply/3]).
 -export([get/1, add/2, remove/1, replace/2, copy/2, move/2, test/2, apply/2]).
 -export([patch/2, fold/2, keys/2]).
@@ -89,6 +90,12 @@ prettify(JSON) ->
   try jsx:prettify(JSON)
   catch error:_ -> erlang:error(badarg)
   end.
+
+
+-spec filter(JSON::json(), Module::module(), InitialState::any()) -> any().
+
+filter(JSON, Module, InitialState) ->
+  jsonfilter:filter(JSON, Module, InitialState).
 
 
 -spec get(Path::path(), JSON::json()) -> json().
