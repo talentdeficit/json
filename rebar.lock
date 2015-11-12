@@ -1,0 +1,12 @@
+[{<<"jsonfilter">>,
+  {git,"git://github.com/talentdeficit/jsonfilter.git",
+       {ref,"3e4a09467b9a22ce2c1c9f4af270d71e4ec342a7"}},
+  0},
+ {<<"jsonpointer">>,
+  {git,"git://github.com/talentdeficit/jsonpointer.git",
+       {ref,"b6942f06bdaab9f6d25f3906fe245085e70db663"}},
+  0},
+ {<<"jsx">>,
+  {git,"git://github.com/talentdeficit/jsx.git",
+       {ref,"3074d4865b3385a050badf7828ad31490d860df5"}},
+  0}].
