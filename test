@@ -8,8 +8,8 @@
 % tests from https://github.com/json-patch/json-patch-tests
 
 main(Args) ->
-  {ok, TestsBin} = file:read_file("./deps/json_patch_tests/tests.json"),
-  {ok, SpecTestsBin} = file:read_file("./deps/json_patch_tests/spec_tests.json"),
+  {ok, TestsBin} = file:read_file("./json_patch_tests/tests.json"),
+  {ok, SpecTestsBin} = file:read_file("./json_patch_tests/spec_tests.json"),
   Tests = json:from_binary(TestsBin) ++ json:from_binary(SpecTestsBin),
   eunit:test(lists:map(
     fun(Test) -> do(Test) end,
